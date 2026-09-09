@@ -146,6 +146,7 @@ function mysqlPool(): Pool {
     queueLimit: 0,
     enableKeepAlive: true,
     dateStrings: true,
+    timezone: 'Z',
     ...(parsed.protocol === 'mysqls:' || env('MYSQL_SSL') === 'true'
       ? { ssl: { rejectUnauthorized: true } }
       : {}),
