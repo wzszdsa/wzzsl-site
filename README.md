@@ -88,7 +88,7 @@ MYSQL_CONNECTION_LIMIT=4
 
 ```powershell
 # 先在 MySQL 中创建或选择目标数据库，再执行：
-& 'D:\MySQL\bin\mysql.exe' -h 主机 -P 3306 -u 用户名 -p 数据库名 < mysql\schema.sql
+Get-Content -Raw mysql\schema.sql | & 'D:\MySQL\bin\mysql.exe' -h 主机 -P 3306 -u 用户名 -p 数据库名
 ```
 
 不要把 MySQL 密码写入前端、提交到 Git 或写入 `README.md`。迁移前请先备份现有数据库；当前代码仍保留 `STORAGE_PROVIDER=supabase` 回滚分支，完成 MySQL 验证后再删除旧的 Supabase 依赖和迁移文件。
