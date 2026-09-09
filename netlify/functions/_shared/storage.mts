@@ -1,5 +1,6 @@
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
+import { createPool, type Pool, type ResultSetHeader, type RowDataPacket } from 'mysql2/promise'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { env, isProduction } from './config.mts'
 
@@ -9,7 +10,7 @@ const OTP_TABLE = 'yijian_otp_challenges'
 const SESSION_TABLE = 'yijian_sessions'
 
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null
-type StorageProvider = 'supabase' | 'local'
+type StorageProvider = 'mysql' | 'supabase' | 'local'
 
 type UserRow = {
   id: string
@@ -38,6 +39,10 @@ type SessionRow = {
   expires_at: string
 }
 
+type MysqlUserRow = UserRow & RowDataPacket
+type MysqlOtpRow = OtpRow & RowDataPacket
+type MysqlSessionRow = SessionRow & RowDataPacket
+
 export type StoredUser = {
   id: string
   email: string
@@ -62,8 +67,12 @@ export type StoredSession = {
   expiresAt: number
 }
 
+let mysqlPoolInstance: Pool | undefined
+
 function provider(): StorageProvider {
-  return (env('STORAGE_PROVIDER', isProduction() ? 'supabase' : 'local') ?? 'local').toLowerCase() === 'supabase' ? 'supabase' : 'local'
+  const configured = (env('STORAGE_PROVIDER', isProduction() ? 'mysql' : 'local') ?? 'local').trim().toLowerCase()
+  if (configured === 'mysql' || configured === 'supabase') return configured
+  return 'local'
 }
 
 export function usesSupabaseStorage(): boolean {
@@ -104,6 +113,51 @@ function supabase(): SupabaseClient {
   return createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
+function mysqlPool(): Pool {
+  if (mysqlPoolInstance) return mysqlPoolInstance
+
+  const connectionUrl = (env('MYSQL_URL') ?? env('DATABASE_URL'))?.trim()
+  if (!connectionUrl) throw new Error('MySQL_URL 或 DATABASE_URL 未配置')
+
+  let parsed: URL
+  try {
+    parsed = new URL(connectionUrl)
+  } catch {
+    throw new Error('MySQL_URL 格式不正确，应为 mysql://用户名:密码@主机:端口/数据库')
+  }
+  if (parsed.protocol !== 'mysql:' && parsed.protocol !== 'mysqls:') {
+    throw new Error('MySQL_URL 必须使用 mysql:// 或 mysqls://')
+  }
+
+  const database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''))
+  if (!parsed.hostname || !parsed.username || !database) {
+    throw new Error('MySQL_URL 必须包含主机、用户名和数据库名')
+  }
+
+  const connectionLimit = Number(env('MYSQL_CONNECTION_LIMIT', '4') ?? '4')
+  mysqlPoolInstance = createPool({
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 3306,
+    user: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    database,
+    waitForConnections: true,
+    connectionLimit: Number.isFinite(connectionLimit) && connectionLimit > 0 ? connectionLimit : 4,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    dateStrings: true,
+    ...(parsed.protocol === 'mysqls:' || env('MYSQL_SSL') === 'true'
+      ? { ssl: { rejectUnauthorized: true } }
+      : {}),
+  })
+  return mysqlPoolInstance
+}
+
+function parseDatabaseDate(value: string): number {
+  const normalized = value.includes('T') ? value : `${value.replace(' ', 'T')}Z`
+  return Date.parse(normalized)
+}
+
 function userFromRow(row: UserRow): StoredUser {
   return {
     id: row.id,
@@ -118,21 +172,28 @@ function userFromRow(row: UserRow): StoredUser {
 function otpFromRow(row: OtpRow): StoredOtp {
   return {
     hash: row.code_hash,
-    sentAt: Date.parse(row.sent_at),
-    expiresAt: Date.parse(row.expires_at),
+    sentAt: parseDatabaseDate(row.sent_at),
+    expiresAt: parseDatabaseDate(row.expires_at),
     attempts: Number(row.attempts),
-    windowStartedAt: Date.parse(row.window_started_at),
+    windowStartedAt: parseDatabaseDate(row.window_started_at),
     sentCount: Number(row.sent_count),
-    ...(row.used_at ? { usedAt: Date.parse(row.used_at) } : {}),
+    ...(row.used_at ? { usedAt: parseDatabaseDate(row.used_at) } : {}),
   }
 }
 
 function sessionFromRow(row: SessionRow): StoredSession {
-  return { userId: row.user_id, expiresAt: Date.parse(row.expires_at) }
+  return { userId: row.user_id, expiresAt: parseDatabaseDate(row.expires_at) }
 }
 
 export async function readUserByEmail(email: string): Promise<StoredUser | null> {
   if (provider() === 'local') return readLocal<StoredUser>(`user:email:${email}`)
+  if (provider() === 'mysql') {
+    const [rows] = await mysqlPool().query<MysqlUserRow[]>(
+      'SELECT id,email,password_hash,email_verified_at,created_at,updated_at FROM yijian_users WHERE email = ? LIMIT 1',
+      [email],
+    )
+    return rows[0] ? userFromRow(rows[0]) : null
+  }
   const { data, error } = await supabase().from(USER_TABLE).select('id,email,password_hash,email_verified_at,created_at,updated_at').eq('email', email).maybeSingle()
   if (error) throw error
   return data ? userFromRow(data as UserRow) : null
@@ -140,6 +201,13 @@ export async function readUserByEmail(email: string): Promise<StoredUser | null>
 
 export async function readUserById(id: string): Promise<StoredUser | null> {
   if (provider() === 'local') return readLocal<StoredUser>(`user:id:${id}`)
+  if (provider() === 'mysql') {
+    const [rows] = await mysqlPool().query<MysqlUserRow[]>(
+      'SELECT id,email,password_hash,email_verified_at,created_at,updated_at FROM yijian_users WHERE id = ? LIMIT 1',
+      [id],
+    )
+    return rows[0] ? userFromRow(rows[0]) : null
+  }
   const { data, error } = await supabase().from(USER_TABLE).select('id,email,password_hash,email_verified_at,created_at,updated_at').eq('id', id).maybeSingle()
   if (error) throw error
   return data ? userFromRow(data as UserRow) : null
@@ -149,6 +217,13 @@ export async function saveUser(user: StoredUser): Promise<void> {
   if (provider() === 'local') {
     await writeLocal(`user:email:${user.email}`, user)
     await writeLocal(`user:id:${user.id}`, user)
+    return
+  }
+  if (provider() === 'mysql') {
+    await mysqlPool().execute<ResultSetHeader>(
+      'INSERT INTO yijian_users (id,email,password_hash,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
+      [user.id, user.email, user.passwordHash ?? null, user.emailVerifiedAt ?? user.createdAt, user.createdAt, user.updatedAt],
+    )
     return
   }
   const { error } = await supabase().from(USER_TABLE).insert({
@@ -164,6 +239,13 @@ export async function saveUser(user: StoredUser): Promise<void> {
 
 export async function readOtp(email: string, purpose: string): Promise<StoredOtp | null> {
   if (provider() === 'local') return readLocal<StoredOtp>(`otp:${purpose}:${email}`)
+  if (provider() === 'mysql') {
+    const [rows] = await mysqlPool().query<MysqlOtpRow[]>(
+      'SELECT email,purpose,code_hash,sent_at,expires_at,attempts,window_started_at,sent_count,used_at FROM yijian_otp_challenges WHERE email = ? AND purpose = ? LIMIT 1',
+      [email, purpose],
+    )
+    return rows[0] ? otpFromRow(rows[0]) : null
+  }
   const { data, error } = await supabase().from(OTP_TABLE).select('email,purpose,code_hash,sent_at,expires_at,attempts,window_started_at,sent_count,used_at').eq('email', email).eq('purpose', purpose).maybeSingle()
   if (error) throw error
   return data ? otpFromRow(data as OtpRow) : null
@@ -172,6 +254,19 @@ export async function readOtp(email: string, purpose: string): Promise<StoredOtp
 export async function writeOtp(email: string, purpose: string, record: StoredOtp): Promise<void> {
   if (provider() === 'local') {
     await writeLocal(`otp:${purpose}:${email}`, record)
+    return
+  }
+  if (provider() === 'mysql') {
+    await mysqlPool().execute<ResultSetHeader>(
+      `INSERT INTO yijian_otp_challenges
+        (email,purpose,code_hash,sent_at,expires_at,attempts,window_started_at,sent_count,used_at)
+       VALUES (?,?,?,?,?,?,?, ?, NULL)
+       ON DUPLICATE KEY UPDATE
+        code_hash = VALUES(code_hash), sent_at = VALUES(sent_at), expires_at = VALUES(expires_at),
+        attempts = VALUES(attempts), window_started_at = VALUES(window_started_at),
+        sent_count = VALUES(sent_count), used_at = NULL`,
+      [email, purpose, record.hash, new Date(record.sentAt), new Date(record.expiresAt), record.attempts, new Date(record.windowStartedAt), record.sentCount],
+    )
     return
   }
   const { error } = await supabase().from(OTP_TABLE).upsert({
@@ -196,6 +291,13 @@ export async function incrementOtpAttempts(email: string, purpose: string, expec
     await writeLocal(key, { ...current, attempts: current.attempts + 1 })
     return true
   }
+  if (provider() === 'mysql') {
+    const [result] = await mysqlPool().execute<ResultSetHeader>(
+      'UPDATE yijian_otp_challenges SET attempts = attempts + 1 WHERE email = ? AND purpose = ? AND attempts = ? AND used_at IS NULL',
+      [email, purpose, expectedAttempts],
+    )
+    return result.affectedRows > 0
+  }
   const { data, error } = await supabase().from(OTP_TABLE).update({ attempts: expectedAttempts + 1 }).eq('email', email).eq('purpose', purpose).eq('attempts', expectedAttempts).is('used_at', null).select('email').limit(1)
   if (error) throw error
   return Boolean(data?.length)
@@ -209,6 +311,13 @@ export async function consumeOtp(email: string, purpose: string, expectedHash: s
     await deleteLocal(key)
     return true
   }
+  if (provider() === 'mysql') {
+    const [result] = await mysqlPool().execute<ResultSetHeader>(
+      'UPDATE yijian_otp_challenges SET used_at = UTC_TIMESTAMP(3) WHERE email = ? AND purpose = ? AND code_hash = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP(3)',
+      [email, purpose, expectedHash],
+    )
+    return result.affectedRows > 0
+  }
   const now = new Date().toISOString()
   const { data, error } = await supabase().from(OTP_TABLE).update({ used_at: now }).eq('email', email).eq('purpose', purpose).eq('code_hash', expectedHash).is('used_at', null).gt('expires_at', now).select('email').limit(1)
   if (error) throw error
@@ -217,6 +326,13 @@ export async function consumeOtp(email: string, purpose: string, expectedHash: s
 
 export async function readSession(tokenHash: string): Promise<StoredSession | null> {
   if (provider() === 'local') return readLocal<StoredSession>(`session:${tokenHash}`)
+  if (provider() === 'mysql') {
+    const [rows] = await mysqlPool().query<MysqlSessionRow[]>(
+      'SELECT token_hash,user_id,expires_at FROM yijian_sessions WHERE token_hash = ? LIMIT 1',
+      [tokenHash],
+    )
+    return rows[0] ? sessionFromRow(rows[0]) : null
+  }
   const { data, error } = await supabase().from(SESSION_TABLE).select('token_hash,user_id,expires_at').eq('token_hash', tokenHash).maybeSingle()
   if (error) throw error
   return data ? sessionFromRow(data as SessionRow) : null
@@ -225,6 +341,14 @@ export async function readSession(tokenHash: string): Promise<StoredSession | nu
 export async function writeSession(tokenHash: string, session: StoredSession): Promise<void> {
   if (provider() === 'local') {
     await writeLocal(`session:${tokenHash}`, session)
+    return
+  }
+  if (provider() === 'mysql') {
+    await mysqlPool().execute<ResultSetHeader>(
+      `INSERT INTO yijian_sessions (token_hash,user_id,expires_at) VALUES (?,?,?)
+       ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), expires_at = VALUES(expires_at)`,
+      [tokenHash, session.userId, new Date(session.expiresAt)],
+    )
     return
   }
   const { error } = await supabase().from(SESSION_TABLE).upsert({
@@ -240,10 +364,16 @@ export async function deleteSession(tokenHash: string): Promise<void> {
     await deleteLocal(`session:${tokenHash}`)
     return
   }
+  if (provider() === 'mysql') {
+    await mysqlPool().execute<ResultSetHeader>('DELETE FROM yijian_sessions WHERE token_hash = ?', [tokenHash])
+    return
+  }
   const { error } = await supabase().from(SESSION_TABLE).delete().eq('token_hash', tokenHash)
   if (error) throw error
 }
 
 export function isUniqueViolation(error: unknown): boolean {
-  return Boolean(error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === '23505')
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as { code?: string | number; errno?: number }
+  return candidate.code === '23505' || candidate.code === 'ER_DUP_ENTRY' || candidate.errno === 1062
 }

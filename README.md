@@ -64,34 +64,34 @@ AUTH_EXPOSE_DEMO_CODE=false
 
 真实 API Key 只配置在 Netlify 环境变量中，前端不会读取。
 
-## Supabase 数据库配置
+## MySQL 数据库配置
 
-认证接口使用关系型表保存账号、验证码挑战和会话：
+认证接口使用 MySQL 关系表保存账号、验证码挑战和会话：
 
-- `public.yijian_users`：邮箱、密码哈希、验证时间和创建时间；邮箱由数据库唯一约束保证不重复。
-- `public.yijian_otp_challenges`：每个邮箱和用途只保留一个当前验证码，服务端只保存哈希，验证码使用后不可重放。
-- `public.yijian_sessions`：只保存不可逆的会话令牌摘要，账号删除时会级联清理会话。
+- `yijian_users`：邮箱、密码哈希、验证时间和创建时间；邮箱由唯一索引保证不重复。
+- `yijian_otp_challenges`：每个邮箱和用途只保留一个当前验证码，服务端只保存哈希，验证码使用后不可重放。
+- `yijian_sessions`：只保存不可逆的会话令牌摘要，账号删除时会级联清理会话。
 
-迁移文件为 `supabase/migrations/20260908150026_yijian_auth_relational_storage.sql`。它会从上一版 `public.yijian_kv` 回填已有账号和未过期会话；旧表暂不删除，便于回滚和核对。三张新表均启用 RLS，并撤销 `anon` / `authenticated` 访问，只由 Netlify Functions 使用服务端 Supabase secret 读写。
+MySQL 建表脚本为 `mysql/schema.sql`。应用通过 `mysql2` 连接池访问数据库，连接串只放在 Netlify Functions 环境变量中。
 
 部署环境配置：
 
 ```text
-STORAGE_PROVIDER=supabase
-SUPABASE_URL=https://你的项目.supabase.co
-SUPABASE_SECRET=服务端 secret，只放在 Netlify Functions 环境变量中
-# 或使用 SUPABASE_SECRET_KEY / SUPABASE_SERVICE_ROLE_KEY
+STORAGE_PROVIDER=mysql
+MYSQL_URL=mysql://用户名:密码@主机:3306/数据库名
+# 云数据库要求 TLS 时启用
+MYSQL_SSL=true
+MYSQL_CONNECTION_LIMIT=4
 ```
 
-本地迁移准备：
+执行建表脚本：
 
 ```powershell
-npx supabase login
-npx supabase link --project-ref 你的项目 ref
-npx supabase db push
+# 先在 MySQL 中创建或选择目标数据库，再执行：
+& 'D:\MySQL\bin\mysql.exe' -h 主机 -P 3306 -u 用户名 -p 数据库名 < mysql\schema.sql
 ```
 
-执行远程迁移前，请确认 Supabase 项目和数据库备份；不要把 secret 写入前端或提交到仓库。迁移后再在 Netlify 的 Functions 环境变量中配置同一组 `SUPABASE_URL` 和 secret，并重新部署。
+不要把 MySQL 密码写入前端、提交到 Git 或写入 `README.md`。迁移前请先备份现有数据库；当前代码仍保留 `STORAGE_PROVIDER=supabase` 回滚分支，完成 MySQL 验证后再删除旧的 Supabase 依赖和迁移文件。
 
 ## 后端接口
 
