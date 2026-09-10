@@ -13,17 +13,13 @@ type AuthStatus = 'checking' | 'authenticated' | 'anonymous' | 'unavailable'
 type AuthUser = { id: string; email: string; createdAt: string }
 type AuthResponse = { user?: AuthUser | null; message?: string; code?: string; retryAfter?: number; demoCode?: string }
 type SendCodeResult = { ok: boolean; status: number; retryAfter?: number; message?: string }
+type ParcelQueryResponse = { parcels?: Parcel[]; parcel?: { trackingNo: string; status: Status }; message?: string; code?: string }
 
 type Event = { time: string; title: string; text: string; active?: boolean }
 type Parcel = { id: string; carrier: string; short: string; color: string; pale: string; tracking: string; title: string; route: string; status: Status; eta: string; updated: string; location: string; code?: string; spot?: string; events: Event[] }
 type Provider = { name: string; short: string; color: string; pale: string; connected: boolean; synced?: string; description: string }
 
-const initialParcels: Parcel[] = [
-  { id: 'sf-1428309204', carrier: '顺丰速运', short: '顺丰', color: '#ed6b4d', pale: '#fff0ea', tracking: 'SF142 830 920 4', title: '日用收纳用品', route: '深圳 → 杭州', status: '待取件', eta: '今天 18:30 前', updated: '12 分钟前', location: '星河湾 2 号驿站', code: 'A6-219', spot: '星河湾 2 号驿站 · 取件柜 06', events: [{ time: '14:18', title: '包裹已到站', text: '包裹已放入星河湾 2 号驿站，请及时取件。', active: true }, { time: '11:42', title: '快递员派送中', text: '杭州滨江区江虹路营业点正在派送。' }, { time: '昨天 20:06', title: '到达杭州', text: '快件到达杭州转运中心。' }, { time: '9 月 6 日', title: '已从深圳发出', text: '快件离开深圳宝安中转场。' }] },
-  { id: 'jd-3881024501', carrier: '京东物流', short: '京东', color: '#4a6ff0', pale: '#edf2ff', tracking: 'JD388 102 450 1', title: '桌面显示器支架', route: '北京 → 杭州', status: '运输中', eta: '预计明天送达', updated: '28 分钟前', location: '运输中 · 杭州方向', events: [{ time: '13:56', title: '运输中', text: '包裹正在前往杭州配送站。', active: true }, { time: '10:28', title: '到达北京转运中心', text: '快件已完成分拣，准备发往杭州。' }, { time: '9 月 7 日', title: '已揽收', text: '京东快递员已完成揽收。' }] },
-  { id: 'yto-7719032608', carrier: '圆通速递', short: '圆通', color: '#f0a334', pale: '#fff6e4', tracking: 'YT771 903 260 8', title: '书籍 · 2 件', route: '武汉 → 杭州', status: '待取件', eta: '今天 20:00 前', updated: '1 小时前', location: '滨盛小区 1 号驿站', code: 'B2-074', spot: '滨盛小区 1 号驿站 · 前台', events: [{ time: '13:06', title: '包裹已到站', text: '已由驿站代收，请凭取件码领取。', active: true }, { time: '10:30', title: '派送中', text: '快递员正在派送，预计今天送达。' }, { time: '9 月 7 日', title: '已揽收', text: '圆通武汉光谷网点已揽收。' }] },
-  { id: 'yd-6201158803', carrier: '韵达快递', short: '韵达', color: '#7659d6', pale: '#f1edff', tracking: 'YD620 115 880 3', title: '咖啡豆', route: '昆明 → 杭州', status: '已完成', eta: '已取件', updated: '昨天 19:23', location: '已从滨盛小区驿站取出', events: [{ time: '昨天 19:23', title: '用户已确认取件', text: '取件码已按隐私策略删除。', active: true }, { time: '昨天 17:48', title: '包裹已到站', text: '包裹已放入滨盛小区驿站。' }, { time: '9 月 6 日', title: '运输中', text: '快件正在前往杭州。' }] },
-]
+const initialParcels: Parcel[] = []
 
 const providerList: Provider[] = [
   { name: '顺丰速运', short: '顺丰', color: '#ed6b4d', pale: '#fff0ea', connected: true, synced: '2 分钟前', description: '物流轨迹 · 到站提醒 · 取件码' },
@@ -53,7 +49,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [syncing, setSyncing] = useState(false)
-  const [lastSync, setLastSync] = useState('刚刚')
+  const [lastSync, setLastSync] = useState('尚未查询')
+  const [trackingNumber, setTrackingNumber] = useState('')
   const [notice, setNotice] = useState('')
   const [mobileNav, setMobileNav] = useState(false)
   const [modal, setModal] = useState(false)
@@ -75,6 +72,9 @@ export default function App() {
         setUser(data.user)
         setEmail(data.user.email)
         setAuthStatus('authenticated')
+        void apiRequest<ParcelQueryResponse>('/api/parcels').then(({ response: parcelResponse, data: parcelData }) => {
+          if (active && parcelResponse.ok) setParcels(parcelData?.parcels ?? [])
+        })
       } else if (response.status === 401) {
         setAuthStatus('anonymous')
       } else {
@@ -87,13 +87,32 @@ export default function App() {
   }, [])
 
   const selected = useMemo(() => parcels.find((item) => item.id === selectedId) ?? null, [parcels, selectedId])
-  const connected = providerList.filter((item) => item.connected).length
+  const connected = new Set(parcels.map((item) => item.carrier)).size
   const waiting = parcels.filter((item) => item.status === '待取件').length
   const transit = parcels.filter((item) => item.status === '运输中').length
   const filtered = useMemo(() => parcels.filter((item) => (filter === '全部' || item.status === filter) && (!query.trim() || [item.carrier, item.title, item.tracking, item.location].some((field) => field.toLowerCase().includes(query.trim().toLowerCase())))), [filter, parcels, query])
 
   const toast = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(''), 2600) }
-  const sync = () => { if (syncing) return; setSyncing(true); window.setTimeout(() => { setSyncing(false); setLastSync('刚刚'); toast('已完成同步，4 个平台返回了最新状态') }, 850) }
+  const queryTrackingNumber = async (trackingValue: string) => {
+    if (syncing) return
+    const normalizedTrackingNo = trackingValue.trim().replace(/\s/g, '')
+    if (!/^[A-Za-z0-9-]{4,128}$/.test(normalizedTrackingNo)) return toast('请输入正确的快递运单号')
+    setSyncing(true)
+    try {
+      const { response, data } = await apiRequest<ParcelQueryResponse>('/api/parcels/query-tracking', { method: 'POST', body: JSON.stringify({ trackingNo: normalizedTrackingNo }) })
+      if (!response.ok || !data) return toast(data?.message ?? '运单查询失败，请稍后重试')
+      const { response: parcelResponse, data: parcelData } = await apiRequest<ParcelQueryResponse>('/api/parcels')
+      if (parcelResponse.ok) setParcels(parcelData?.parcels ?? [])
+      setLastSync('刚刚')
+      toast(data.message ?? '物流信息已同步')
+    } catch {
+      toast('暂时无法连接物流查询服务，请稍后重试')
+    } finally {
+      setSyncing(false)
+    }
+  }
+  const sync = () => { void queryTrackingNumber(trackingNumber) }
+
   const copy = (code: string) => { navigator.clipboard?.writeText(code).then(() => toast(`取件码 ${code} 已复制`)).catch(() => toast('复制失败，请手动记录')) }
   const confirm = (parcel: Parcel) => { setParcels((items) => items.map((item) => item.id === parcel.id ? { ...item, status: '已完成', eta: '已取件', code: undefined, updated: '刚刚', location: '已从驿站取出', events: [{ time: '刚刚', title: '用户已确认取件', text: '取件码已按隐私策略删除。', active: true }, ...item.events] } : item)); setSelectedId(null); setVisible((items) => ({ ...items, [parcel.id]: false })); toast('已确认取件，取件码已删除') }
 
@@ -234,7 +253,7 @@ export default function App() {
       <main className="main">
         <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)}><Menu size={21} /></button><div className="crumb"><span>驿站工作台</span><ChevronRight size={14} /><b>{view === 'packages' ? '我的包裹' : view === 'sources' ? '数据来源' : '账号设置'}</b></div><div className="top-actions"><button className="icon-btn dot" onClick={() => toast('暂无新的未读提醒')}><Bell size={18} /></button><button className="account-chip" onClick={() => { setAuthView('login'); setModal(true) }}><span className="avatar small">{avatarText(user.email)}</span><span>{maskEmail(user.email)}</span><ChevronRight size={14} /></button></div></header>
         <div className="content">
-          {view === 'packages' && <Packages parcels={parcels} filtered={filtered} filter={filter} setFilter={setFilter} query={query} setQuery={setQuery} waiting={waiting} transit={transit} connected={connected} syncing={syncing} lastSync={lastSync} onSync={sync} visible={visible} setVisible={setVisible} onOpen={setSelectedId} onCopy={copy} onConfirm={confirm} />}
+          {view === 'packages' && <Packages parcels={parcels} filtered={filtered} filter={filter} setFilter={setFilter} query={query} setQuery={setQuery} trackingNumber={trackingNumber} setTrackingNumber={setTrackingNumber} waiting={waiting} transit={transit} connected={connected} syncing={syncing} lastSync={lastSync} onSync={sync} visible={visible} setVisible={setVisible} onOpen={setSelectedId} onCopy={copy} onConfirm={confirm} />}
           {view === 'sources' && <Sources connected={connected} onConnect={(provider) => toast(`${provider.name} 的授权流程将在接入真实 API 后启用`)} />}
           {view === 'settings' && <Settings email={user.email} autoSync={autoSync} push={push} setAutoSync={setAutoSync} setPush={setPush} onLogout={logout} />}
         </div>
@@ -254,14 +273,19 @@ function Header({ kicker, title, text, action }: { kicker: ReactNode; title: Rea
   return <section className="heading"><div><div className="eyebrow">{kicker}</div><h1>{title}</h1><p>{text}</p></div>{action}</section>
 }
 
-function Packages({ parcels, filtered, filter, setFilter, query, setQuery, waiting, transit, connected, syncing, lastSync, onSync, visible, setVisible, onOpen, onCopy, onConfirm }: { parcels: Parcel[]; filtered: Parcel[]; filter: Filter; setFilter: (value: Filter) => void; query: string; setQuery: (value: string) => void; waiting: number; transit: number; connected: number; syncing: boolean; lastSync: string; onSync: () => void; visible: Record<string, boolean>; setVisible: React.Dispatch<React.SetStateAction<Record<string, boolean>>>; onOpen: (id: string) => void; onCopy: (code: string) => void; onConfirm: (parcel: Parcel) => void }) {
+function Packages({ parcels, filtered, filter, setFilter, query, setQuery, trackingNumber, setTrackingNumber, waiting, transit, connected, syncing, lastSync, onSync, visible, setVisible, onOpen, onCopy, onConfirm }: { parcels: Parcel[]; filtered: Parcel[]; filter: Filter; setFilter: (value: Filter) => void; query: string; setQuery: (value: string) => void; trackingNumber: string; setTrackingNumber: (value: string) => void; waiting: number; transit: number; connected: number; syncing: boolean; lastSync: string; onSync: () => void; visible: Record<string, boolean>; setVisible: React.Dispatch<React.SetStateAction<Record<string, boolean>>>; onOpen: (id: string) => void; onCopy: (code: string) => void; onConfirm: (parcel: Parcel) => void }) {
   return <>
-    <Header kicker={<><Sparkles size={14} /> 周二 · 9 月 8 日</>} title={<>今天的包裹，<span>一眼就够了。</span></>} text={`已为你同步 ${parcels.length} 个包裹，最后更新于 ${lastSync}。`} action={<button className={`sync-btn ${syncing ? 'syncing' : ''}`} onClick={onSync}><RefreshCw size={17} />{syncing ? '同步中…' : '立即同步'}</button>} />
-    <section className="summary"><div className="hero"><div className="orb one" /><div className="orb two" /><div className="hero-copy"><div className="hero-kicker"><i /> 快递状态已自动更新</div><h2>{waiting ? `有 ${waiting} 个包裹，正在等你取件` : '今天没有待取件包裹'}</h2><p>{waiting ? '取件码只会在你的账号内展示，确认取件后会自动删除。' : '所有包裹都已处理完毕，继续保持轻松。'}</p><div className="stats"><div><b>{waiting}</b><span>待取件</span></div><div><b>{transit}</b><span>运输中</span></div><div><b>{connected}</b><span>已连接平台</span></div></div></div><div className="hero-art"><div><Package size={29} /><small>包裹状态</small><b>实时同步</b></div><span><Check size={14} /></span></div></div><div className="trust"><div className="trust-title"><span><ShieldCheck size={19} /></span>安心提示</div><h3>你的数据，只为你服务</h3><p>邮箱地址经过验证后，我们只同步你授权的平台。取件码不会出现在推送通知里。</p><footer><span><LockKeyhole size={14} /> 加密存储</span><span><Zap size={14} /> 自动清理</span></footer></div></section>
+    <Header kicker={<><Sparkles size={14} /> 运单号查件</>} title={<>你的包裹，<span>一眼就够了。</span></>} text={parcels.length ? `已同步 ${parcels.length} 个包裹，最后更新于 ${lastSync}。` : '输入快递运单号，自动识别快递公司后查询真实物流状态和轨迹。'} action={<button className={`sync-btn ${syncing ? 'syncing' : ''}`} onClick={onSync} disabled={syncing}><RefreshCw size={17} />{syncing ? '查询中…' : '重新查询'}</button>} />
+    <form className="tracking-query" onSubmit={(event) => { event.preventDefault(); onSync() }}>
+      <div><span><Package size={18} /></span><label htmlFor="parcel-tracking"><b>运单号查快递</b><small>手动输入或粘贴运单号；系统会自动识别快递公司，仅同步当前登录账号的物流记录。</small></label></div>
+      <input id="parcel-tracking" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value.replace(/\s/g, '').slice(0, 128))} autoComplete="off" placeholder="请输入快递运单号" maxLength={128} />
+      <button type="submit" disabled={syncing}>{syncing ? '查询中…' : '查询快递'}</button>
+    </form>
+    <section className="summary"><div className="hero"><div className="orb one" /><div className="orb two" /><div className="hero-copy"><div className="hero-kicker"><i /> 快递状态已自动更新</div><h2>{waiting ? `有 ${waiting} 个包裹，正在等你取件` : '今天没有待取件包裹'}</h2><p>{waiting ? '取件码只会在你的账号内展示，确认取件后会自动删除。' : '所有包裹都已处理完毕，继续保持轻松。'}</p><div className="stats"><div><b>{waiting}</b><span>待取件</span></div><div><b>{transit}</b><span>运输中</span></div><div><b>{connected}</b><span>已连接平台</span></div></div></div><div className="hero-art"><div><Package size={29} /><small>包裹状态</small><b>实时同步</b></div><span><Check size={14} /></span></div></div><div className="trust"><div className="trust-title"><span><ShieldCheck size={19} /></span>安心提示</div><h3>你的数据，只为你服务</h3><p>运单号仅用于服务端查询并关联当前登录账号；取件码仅在服务商明确返回时展示，不会出现在推送通知里。</p><footer><span><LockKeyhole size={14} /> 加密存储</span><span><Zap size={14} /> 自动清理</span></footer></div></section>
     <div className="section-head"><div><h2>包裹列表</h2><span>{filtered.length} 个结果</span></div><div className="section-tools"><label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索平台、包裹或单号" /></label><button className="sync-label"><Zap size={15} /> 自动同步中</button></div></div>
     <div className="tabs">{(['全部', '待取件', '运输中', '已完成'] as Filter[]).map((item) => <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>{item}{item !== '全部' && <em>{parcels.filter((parcel) => parcel.status === item).length}</em>}</button>)}</div>
     {filtered.length ? <div className="parcel-grid">{filtered.map((parcel) => <Card key={parcel.id} parcel={parcel} shown={Boolean(visible[parcel.id])} toggle={() => setVisible((items) => ({ ...items, [parcel.id]: !items[parcel.id] }))} onOpen={() => onOpen(parcel.id)} onCopy={onCopy} onConfirm={onConfirm} />)}</div> : <div className="empty"><Search size={24} /><strong>没有找到匹配的包裹</strong><span>试试搜索其他平台或运单号。</span></div>}
-    <div className="integration"><div className="integration-icon"><CircleAlert size={18} /></div><div><strong>数据接入说明</strong><p>当前为交互演示数据。上线前将通过官方或授权的聚合 API 接入真实物流状态；无法返回取件码的平台不会被强行展示。</p></div><button onClick={() => window.alert('请在“数据来源”中查看授权状态。')}>查看授权 <ArrowUpRight size={15} /></button></div>
+    <div className="integration"><div className="integration-icon"><CircleAlert size={18} /></div><div><strong>数据接入说明</strong><p>用户手动提交运单号后，服务端查询真实轨迹并保存到当前账号。取件码仅在已开通取件码数据服务且服务商返回时展示，不会根据运单号猜测。</p></div><button onClick={() => window.alert('请在“数据来源”中查看授权状态。')}>查看授权 <ArrowUpRight size={15} /></button></div>
   </>
 }
 

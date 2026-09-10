@@ -70,7 +70,7 @@ export type StoredSession = {
 let mysqlPoolInstance: Pool | undefined
 
 function provider(): StorageProvider {
-  const configured = (env('STORAGE_PROVIDER', isProduction() ? 'mysql' : 'local') ?? 'local').trim().toLowerCase()
+  const configured = (env('STORAGE_PROVIDER', isProduction() ? 'supabase' : 'local') ?? 'local').trim().toLowerCase()
   if (configured === 'mysql' || configured === 'supabase') return configured
   return 'local'
 }

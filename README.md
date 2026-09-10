@@ -64,34 +64,45 @@ AUTH_EXPOSE_DEMO_CODE=false
 
 真实 API Key 只配置在 Netlify 环境变量中，前端不会读取。
 
-## MySQL 数据库配置
+## Supabase 数据库配置（生产默认）
 
-认证接口使用 MySQL 关系表保存账号、验证码挑战和会话：
+认证接口使用 Supabase Postgres 保存账号、验证码挑战和会话：
 
 - `yijian_users`：邮箱、密码哈希、验证时间和创建时间；邮箱由唯一索引保证不重复。
 - `yijian_otp_challenges`：每个邮箱和用途只保留一个当前验证码，服务端只保存哈希，验证码使用后不可重放。
 - `yijian_sessions`：只保存不可逆的会话令牌摘要，账号删除时会级联清理会话。
 
-MySQL 建表脚本为 `mysql/schema.sql`。应用通过 `mysql2` 连接池访问数据库，连接串只放在 Netlify Functions 环境变量中。
-
-部署环境配置：
+数据库迁移文件位于 `supabase/migrations/`。生产环境在 Netlify Functions 中配置：
 
 ```text
-STORAGE_PROVIDER=mysql
-MYSQL_URL=mysql://用户名:密码@主机:3306/数据库名
-# 云数据库要求 TLS 时启用
-MYSQL_SSL=true
-MYSQL_CONNECTION_LIMIT=4
+STORAGE_PROVIDER=supabase
+SUPABASE_URL=https://你的项目.supabase.co
+SUPABASE_SECRET_KEY=服务端 secret，只放在 Netlify Functions 环境变量中
 ```
 
-执行建表脚本：
+`SUPABASE_SECRET_KEY` 不能写入前端、不能使用 `VITE_` 前缀，也不能提交到 Git。当前仓库已保留 RLS 和服务端权限限制：浏览器不直接访问认证表，认证接口通过服务端 Supabase 客户端读写。
 
-```powershell
-# 先在 MySQL 中创建或选择目标数据库，再执行：
-Get-Content -Raw mysql\schema.sql | & 'D:\MySQL\bin\mysql.exe' -h 主机 -P 3306 -u 用户名 -p 数据库名
+### 可选 MySQL 回退
+
+如果明确需要 MySQL，可改为 `STORAGE_PROVIDER=mysql`，并配置 `MYSQL_URL`、`MYSQL_SSL` 和 `MYSQL_CONNECTION_LIMIT`。建表脚本仍保留在 `mysql/schema.sql`，但生产默认不再依赖 MySQL。
+## 运单号查快递（快递100）
+
+登录用户手动输入运单号后，服务端先调用快递100单号识别接口识别快递公司，再调用实时查询接口，并将物流状态和轨迹保存到 Supabase。快递100不作为手机号反查运单号的通用第三方服务使用。
+
+在 Netlify 环境变量中配置：
+
+```text
+KUAIDI100_KEY=...
+KUAIDI100_CUSTOMER=...
+KUAIDI100_TRACK_QUERY_URL=https://poll.kuaidi100.com/poll/query.do
+KUAIDI100_RECOGNIZE_URL=https://www.kuaidi100.com/autonumber/autoComNum
 ```
 
-不要把 MySQL 密码写入前端、提交到 Git 或写入 `README.md`。迁移前请先备份现有数据库；当前代码仍保留 `STORAGE_PROVIDER=supabase` 回滚分支，完成 MySQL 验证后再删除旧的 Supabase 依赖和迁移文件。
+- `POST /api/parcels/query-tracking`：登录后提交一个运单号，查询并同步物流轨迹。
+- `GET /api/parcels`：获取当前登录用户已同步的包裹和轨迹。
+- 取件码不是由普通物流轨迹推测的，只有上游授权数据明确返回时才会保存和展示。
+
+数据库表定义位于 `supabase/migrations/20260910111618_yijian_parcel_storage.sql`。部署前请在 Supabase SQL Editor 执行该迁移，或使用已链接的 Supabase CLI 推送迁移。
 
 ## 后端接口
 
