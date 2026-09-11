@@ -125,8 +125,14 @@ export async function recognizeTrackingNo(trackingNo: string): Promise<Kuaidi100
     const carrierCode = optionalText(item.comCode)
     return carrierCode ? [{ trackingNo, carrierCode, carrierName: optionalText(item.name) }] : []
   })
-  if (!candidates.length) throw new Error('未能识别快递公司，请确认运单号是否正确')
-  return candidates
+  if (candidates.length) return candidates
+
+  // 快递100的自动识别接口偶尔不会返回 JT/极兔，但查询接口支持其固定编码。
+  if (/^JT/i.test(trackingNo)) {
+    return [{ trackingNo, carrierCode: 'jtexpress', carrierName: '极兔速递' }]
+  }
+
+  throw new Error('未能识别快递公司，请确认运单号是否正确')
 }
 
 export async function queryTracking(candidate: Kuaidi100TrackingCandidate): Promise<Kuaidi100TrackingDetail> {
