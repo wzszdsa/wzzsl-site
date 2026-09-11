@@ -19,7 +19,11 @@ export default async function handler(request: Request): Promise<Response> {
     if (purposeValue !== 'login' && purposeValue !== 'register') return json({ message: '验证码用途不正确，请刷新页面后重试', code: 'INVALID_PURPOSE' }, 400)
     const purpose: AuthPurpose = purposeValue
 
-    if (purpose === 'register' && await readUserByEmail(email)) {
+    const existingUser = await readUserByEmail(email)
+    if (purpose === 'login' && !existingUser) {
+      return json({ message: '该邮箱尚未注册，无法发送验证码，请先注册', code: 'EMAIL_NOT_REGISTERED' }, 404)
+    }
+    if (purpose === 'register' && existingUser) {
       return json({ message: '该邮箱已经注册，已为你切换到登录', code: 'EMAIL_ALREADY_REGISTERED' }, 409)
     }
 

@@ -239,7 +239,10 @@ export default function App() {
 
   if (authStatus === 'checking') return <AuthLoading />
 
-  if (authStatus !== 'authenticated' || !user) return <LoginPage view={authView} setView={changeAuthView} mode={authMode} setMode={changeAuthMode} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onSubmit={submitAuth} onNotice={toast} onSendCode={sendCode} busy={authBusy} demoMode={demoAuthEnabled} backendUnavailable={authStatus === 'unavailable'} />
+  if (authStatus !== 'authenticated' || !user) return <>
+    <LoginPage view={authView} setView={changeAuthView} mode={authMode} setMode={changeAuthMode} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onSubmit={submitAuth} onNotice={toast} onSendCode={sendCode} busy={authBusy} demoMode={demoAuthEnabled} backendUnavailable={authStatus === 'unavailable'} />
+    {notice && <div className="toast" role="status" aria-live="polite"><CircleCheck size={17} />{notice}</div>}
+  </>
 
   return (    <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
@@ -333,6 +336,7 @@ function AuthForm({ view, setView, mode, setMode, email, setEmail, password, set
   const [sendingCode, setSendingCode] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [lastSentEmail, setLastSentEmail] = useState('')
+  const [sendCodeError, setSendCodeError] = useState('')
 
   useEffect(() => {
     if (countdown <= 0) return
@@ -347,11 +351,16 @@ function AuthForm({ view, setView, mode, setMode, email, setEmail, password, set
       onNotice('请输入正确的邮箱地址')
       return
     }
+    setSendCodeError('')
     setSendingCode(true)
     try {
       const result = await onSendCode(normalizedEmail, isRegistering ? 'register' : 'login')
       if (result.retryAfter && result.retryAfter > 0) setCountdown(result.retryAfter)
-      if (result.ok) setLastSentEmail(normalizedEmail)
+      if (result.ok) {
+        setLastSentEmail(normalizedEmail)
+      } else {
+        setSendCodeError(result.message ?? '验证码发送失败，请稍后重试')
+      }
     } finally {
       setSendingCode(false)
     }
@@ -370,8 +379,8 @@ function AuthForm({ view, setView, mode, setMode, email, setEmail, password, set
     <div className="auth-form-heading"><div><b>{isRegistering ? '创建你的账号' : '登录账号'}</b><small>{isRegistering ? '验证邮箱，开始同步你的快递' : '使用邮箱进入你的包裹空间'}</small></div>{isRegistering && <span className="new-account-tag">新用户</span>}</div>
     {backendUnavailable && <div className="auth-status-note" role="status"><CircleAlert size={15} /><span>{demoMode ? '后端暂未连接，当前可用本地演示验证码 123456' : '认证服务暂时不可用，请稍后重试'}</span></div>}
     <div className="auth-tabs" role="tablist" aria-label="登录方式"><button type="button" role="tab" aria-selected={mode === 'code'} className={mode === 'code' ? 'active' : ''} onClick={() => switchMode('code')}>{isRegistering ? '邮箱验证码注册' : '邮箱验证码登录'}</button><button type="button" role="tab" aria-selected={mode === 'password'} className={mode === 'password' ? 'active' : ''} onClick={() => switchMode('password')}>{isRegistering ? '密码注册' : '密码登录'}</button></div>
-    <label htmlFor="auth-email">邮箱地址<input id="auth-email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" placeholder="请输入邮箱地址" required /></label>
-    {(mode === 'code' || isRegistering) && <label htmlFor="auth-code">邮箱验证码<div className="code-input"><input id="auth-code" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="输入 6 位验证码" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required /><button type="button" disabled={countdown > 0 || sendingCode || busy} onClick={() => void handleSendCode()}>{sendingCode ? '发送中…' : countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}</button></div>{lastSentEmail && <small className="auth-hint" role="status">验证码已发送到 {maskEmail(lastSentEmail)}，5 分钟内有效</small>}</label>}
+    <label htmlFor="auth-email">邮箱地址<input id="auth-email" value={email} onChange={(event) => { setEmail(event.target.value); setSendCodeError('') }} type="email" autoComplete="email" placeholder="请输入邮箱地址" required /></label>
+    {(mode === 'code' || isRegistering) && <label htmlFor="auth-code">邮箱验证码<div className="code-input"><input id="auth-code" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="输入 6 位验证码" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required /><button type="button" disabled={countdown > 0 || sendingCode || busy} onClick={() => void handleSendCode()}>{sendingCode ? '发送中…' : countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}</button></div>{lastSentEmail && <small className="auth-hint" role="status">验证码已发送到 {maskEmail(lastSentEmail)}，5 分钟内有效</small>}{sendCodeError && <small className="auth-hint auth-error" role="alert">{sendCodeError}</small>}</label>}
     {(mode === 'password' || isRegistering) && <label htmlFor="auth-password">{isRegistering ? '设置密码（可选）' : '登录密码'}<div className="password-input"><KeyRound size={16} /><input id="auth-password" value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? 'text' : 'password'} autoComplete={isRegistering ? 'new-password' : 'current-password'} maxLength={128} placeholder={isRegistering ? '可选，至少 6 位' : '请输入登录密码'} />{password && <button type="button" className="password-toggle" aria-label={showPassword ? '隐藏密码' : '显示密码'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>}</div></label>}
     {isRegistering && <small className="auth-hint auth-password-note">注册始终需要邮箱验证码；不设置密码也可以使用验证码登录。</small>}
     <button className="submit" type="submit" disabled={busy}>{busy ? <RefreshCw size={17} className="spin" /> : isRegistering ? <UserRound size={17} /> : <LogIn size={17} />} {busy ? '处理中…' : isRegistering ? '创建账号' : '进入我的包裹'}</button>
