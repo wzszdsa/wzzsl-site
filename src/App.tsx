@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent, ReactNode } from 'react'
-import { ArrowUpRight, Bell, Check, ChevronRight, CircleAlert, CircleCheck, Clipboard, Clock3, Copy, Eye, EyeOff, House, KeyRound, Layers3, Link2, LockKeyhole, LogIn, LogOut, MapPin, Menu, Package, PackageCheck, RefreshCw, Search, Settings2, ShieldCheck, Smartphone, Sparkles, Truck, UserRound, X, Zap } from 'lucide-react'
+import { ArrowUpRight, Bell, Check, ChevronRight, CircleAlert, CircleCheck, Clipboard, Clock3, Copy, Eye, EyeOff, House, KeyRound, Layers3, Link2, LockKeyhole, LogIn, LogOut, MapPin, Menu, Package, PackageCheck, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Truck, UserRound, X, Zap } from 'lucide-react'
 import { apiRequest } from './api'
 import './App.css'
 
@@ -12,8 +12,9 @@ type AuthView = 'login' | 'register'
 type AuthStatus = 'checking' | 'authenticated' | 'anonymous' | 'unavailable'
 type AuthUser = { id: string; email: string; createdAt: string; passwordSet?: boolean }
 type AuthResponse = { user?: AuthUser | null; message?: string; code?: string; retryAfter?: number; demoCode?: string }
-type SendCodeResult = { ok: boolean; status: number; retryAfter?: number; message?: string }
+type SendCodeResult = { ok: boolean; status: number; retryAfter?: number; message?: string; code?: string }
 type ParcelQueryResponse = { parcels?: Parcel[]; parcel?: { trackingNo: string; status: Status }; message?: string; code?: string }
+type ParcelMutationResponse = { message?: string; code?: string }
 
 type Event = { time: string; title: string; text: string; active?: boolean; location?: string; lat?: number; lng?: number }
 type Parcel = { id: string; carrier: string; short: string; color: string; pale: string; tracking: string; title: string; route: string; status: Status; eta: string; updated: string; location: string; code?: string; spot?: string; events: Event[] }
@@ -43,6 +44,14 @@ const nav: Array<{ key: View; label: string; icon: ReactNode }> = [
 const maskEmail = (email: string) => { const [local, domain] = email.split('@'); if (!domain) return email; return `${local.slice(0, 2)}***@${domain}` }
 const avatarText = (email: string) => email.trim().charAt(0).toUpperCase() || '驿'
 const cssVars = (color: string, pale: string) => ({ '--carrier': color, '--carrier-pale': pale } as CSSProperties)
+const readBooleanPreference = (key: string, fallback: boolean) => {
+  try {
+    const value = typeof window === 'undefined' ? null : window.localStorage.getItem(key)
+    return value === null ? fallback : value === 'true'
+  } catch {
+    return fallback
+  }
+}
 
 export default function App() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking')
@@ -58,17 +67,19 @@ export default function App() {
   const [trackingNumber, setTrackingNumber] = useState('')
   const [notice, setNotice] = useState('')
   const [mobileNav, setMobileNav] = useState(false)
-  const [modal, setModal] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const accountAreaRef = useRef<HTMLDivElement>(null)
+  const [autoSync, setAutoSync] = useState(() => readBooleanPreference('yijian.autoSync', true))
+  const [push, setPush] = useState(() => readBooleanPreference('yijian.push', true))
   const [authMode, setAuthMode] = useState<AuthMode>('code')
   const [authView, setAuthView] = useState<AuthView>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [authBusy, setAuthBusy] = useState(false)
   const [verificationTarget, setVerificationTarget] = useState('')
-  const [autoSync, setAutoSync] = useState(true)
-  const [push, setPush] = useState(true)
   const [passwordSetupOpen, setPasswordSetupOpen] = useState(false)
   const [passwordSetupBusy, setPasswordSetupBusy] = useState(false)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const demoAuthEnabled = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_AUTH !== 'false'
 
   useEffect(() => {
@@ -93,6 +104,36 @@ export default function App() {
     return () => { active = false }
   }, [])
 
+  useEffect(() => {
+    if (!accountMenuOpen) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (accountAreaRef.current && !accountAreaRef.current.contains(event.target as Node)) setAccountMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [accountMenuOpen])
+
+  useEffect(() => {
+    if (!mobileNav && !accountMenuOpen) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileNav(false)
+        setAccountMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [mobileNav, accountMenuOpen])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('yijian.autoSync', String(autoSync))
+      window.localStorage.setItem('yijian.push', String(push))
+    } catch {
+      // 本地存储不可用时仍保留当前页面内的设置。
+    }
+  }, [autoSync, push])
+
   const selected = useMemo(() => parcels.find((item) => item.id === selectedId) ?? null, [parcels, selectedId])
   const connected = new Set(parcels.map((item) => item.carrier)).size
   const waiting = parcels.filter((item) => item.status === '待取件').length
@@ -100,6 +141,18 @@ export default function App() {
   const filtered = useMemo(() => parcels.filter((item) => (filter === '全部' || item.status === filter) && (!query.trim() || [item.carrier, item.title, item.tracking, item.location].some((field) => field.toLowerCase().includes(query.trim().toLowerCase())))), [filter, parcels, query])
 
   const toast = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(''), 2600) }
+  const openAccountSettings = () => {
+    const alreadyOpen = view === 'settings'
+    setView('settings')
+    setMobileNav(false)
+    setAccountMenuOpen(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    if (alreadyOpen) toast('你已在账号设置')
+  }
+  const toggleAccountMenu = () => {
+    setMobileNav(false)
+    setAccountMenuOpen((open) => !open)
+  }
   const queryTrackingNumber = async (trackingValue: string) => {
     if (syncing) return
     const normalizedTrackingNo = trackingValue.trim().replace(/\s/g, '')
@@ -111,7 +164,7 @@ export default function App() {
       const { response: parcelResponse, data: parcelData } = await apiRequest<ParcelQueryResponse>('/api/parcels')
       if (parcelResponse.ok) setParcels(parcelData?.parcels ?? [])
       setLastSync('刚刚')
-      toast(data.message ?? '物流信息已同步')
+      toast(data.message ?? '物流信息已更新')
     } catch {
       toast('暂时无法连接物流查询服务，请稍后重试')
     } finally {
@@ -121,7 +174,38 @@ export default function App() {
   const sync = () => { void queryTrackingNumber(trackingNumber) }
 
   const copy = (code: string) => { navigator.clipboard?.writeText(code).then(() => toast(`取件码 ${code} 已复制`)).catch(() => toast('复制失败，请手动记录')) }
-  const confirm = (parcel: Parcel) => { setParcels((items) => items.map((item) => item.id === parcel.id ? { ...item, status: '已完成', eta: '已取件', code: undefined, updated: '刚刚', location: '已从驿站取出', events: [{ time: '刚刚', title: '用户已确认取件', text: '取件码已按隐私策略删除。', active: true }, ...item.events] } : item)); setSelectedId(null); setVisible((items) => ({ ...items, [parcel.id]: false })); toast('已确认取件，取件码已删除') }
+  const markParcelPickedUp = (parcelId: string) => {
+    setParcels((items) => items.map((item) => item.id === parcelId ? { ...item, status: '已完成', eta: '已取件', code: undefined, updated: '刚刚', location: '已从驿站取出', events: [{ time: '刚刚', title: '用户已确认取件', text: '取件码已按隐私策略删除。', active: true }, ...item.events] } : item))
+    setSelectedId(null)
+    setVisible((items) => ({ ...items, [parcelId]: false }))
+  }
+
+  const confirm = async (parcel: Parcel) => {
+    if (confirmingId) return
+    setConfirmingId(parcel.id)
+    try {
+      if (demoAuthEnabled) {
+        markParcelPickedUp(parcel.id)
+        toast('演示模式已确认取件，刷新页面后会重置')
+        return
+      }
+      const { response, data } = await apiRequest<ParcelMutationResponse>('/api/parcels/confirm-pickup', { method: 'POST', body: JSON.stringify({ parcelId: parcel.id }) })
+      if (!response.ok) {
+        toast(data?.message ?? '取件状态保存失败，请稍后重试')
+        return
+      }
+      const { response: parcelResponse, data: parcelData } = await apiRequest<ParcelQueryResponse>('/api/parcels')
+      if (parcelResponse.ok) setParcels(parcelData?.parcels ?? [])
+      else markParcelPickedUp(parcel.id)
+      setSelectedId(null)
+      setVisible((items) => ({ ...items, [parcel.id]: false }))
+      toast(data?.message ?? '已确认取件，取件码已删除')
+    } catch {
+      toast('暂时无法保存取件状态，请检查网络后重试')
+    } finally {
+      setConfirmingId(null)
+    }
+  }
 
   const changeAuthView = (value: AuthView) => {
     setAuthView(value)
@@ -156,11 +240,11 @@ export default function App() {
         } else {
           toast(data.message ?? '验证码发送失败')
         }
-        return { ok: false, status: response.status, retryAfter: data.retryAfter, message: data.message }
+        return { ok: false, status: response.status, retryAfter: data.retryAfter, message: data.message, code: data.code }
       }
       setVerificationTarget(normalizedEmail)
       toast(data.demoCode ? `验证码已发送，演示码：${data.demoCode}` : data.message ?? '验证码已发送，请查收邮件')
-      return { ok: true, status: response.status, retryAfter: data.retryAfter ?? 60, message: data.message }
+      return { ok: true, status: response.status, retryAfter: data.retryAfter ?? 60, message: data.message, code: data.code }
     } catch {
       if (demoAuthEnabled) {
         setVerificationTarget(normalizedEmail)
@@ -177,7 +261,6 @@ export default function App() {
     setEmail(authUser.email)
     setAuthStatus('authenticated')
     setAuthBusy(false)
-    setModal(false)
     setPassword('')
     setVerificationTarget('')
     void apiRequest<ParcelQueryResponse>('/api/parcels').then(({ response, data }) => {
@@ -258,10 +341,10 @@ export default function App() {
     } catch {
       toast('本地已退出；网络恢复后请重新打开页面确认会话')
     } finally {
+      setAccountMenuOpen(false)
       setUser(null)
       setAuthStatus('anonymous')
-      setModal(false)
-      changeAuthView('login')
+        changeAuthView('login')
     }
   }
 
@@ -273,25 +356,25 @@ export default function App() {
   </>
 
   return (    <div className="app-shell">
-      <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
+      <button className={`nav-backdrop ${mobileNav ? 'visible' : ''}`} type="button" aria-label="关闭菜单" onClick={() => setMobileNav(false)} />
+      <aside id="primary-navigation" className={`sidebar ${mobileNav ? 'open' : ''}`} aria-label="主导航">
         <div className="brand"><div className="brand-mark"><PackageCheck size={20} /></div><div><strong>驿见</strong><span>你的快递都在这里</span></div></div>
         <div className="side-label">工作台</div>
-        <nav>{nav.map((item) => <button key={item.key} className={`nav-item ${view === item.key ? 'active' : ''}`} onClick={() => { setView(item.key); setMobileNav(false) }}>{item.icon}<span>{item.label}</span>{item.key === 'packages' && waiting > 0 && <em>{waiting}</em>}</button>)}</nav>
+        <nav>{nav.map((item) => <button key={item.key} className={`nav-item ${view === item.key ? 'active' : ''}`} onClick={() => { setView(item.key); setMobileNav(false); setAccountMenuOpen(false) }}>{item.icon}<span>{item.label}</span>{item.key === 'packages' && waiting > 0 && <em>{waiting}</em>}</button>)}</nav>
         <div className="side-spacer" />
-        <div className="privacy-tip"><ShieldCheck size={17} /><div><strong>隐私优先</strong><span>取件码只在你的设备内展示</span></div></div>
-        <button className="side-account" onClick={() => { setView('settings'); setMobileNav(false); setModal(false) }}><span className="avatar">{avatarText(user.email)}</span><span><strong>我的账号</strong><small>{maskEmail(user.email)}</small></span><ChevronRight size={16} /></button>
+        <div className="privacy-tip"><ShieldCheck size={17} /><div><strong>隐私优先</strong><span>取件码只在你的账号内展示</span></div></div>
+        <button className="side-account" type="button" aria-label={`打开账号设置，当前账号 ${maskEmail(user.email)}`} onClick={openAccountSettings}><span className="avatar">{avatarText(user.email)}</span><span><strong>我的账号</strong><small>{maskEmail(user.email)}</small></span><ChevronRight size={16} /></button>
       </aside>
       <main className="main">
-        <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)}><Menu size={21} /></button><div className="crumb"><span>驿站工作台</span><ChevronRight size={14} /><b>{view === 'packages' ? '我的包裹' : view === 'sources' ? '数据来源' : '账号设置'}</b></div><div className="top-actions"><button className="icon-btn dot" onClick={() => toast('暂无新的未读提醒')}><Bell size={18} /></button><button className="account-chip" onClick={() => { setView('settings'); setMobileNav(false); setModal(false) }}><span className="avatar small">{avatarText(user.email)}</span><span>{maskEmail(user.email)}</span><ChevronRight size={14} /></button></div></header>
+        <header className="topbar"><button className="mobile-menu" type="button" aria-label={mobileNav ? '关闭菜单' : '打开菜单'} aria-expanded={mobileNav} aria-controls="primary-navigation" onClick={() => setMobileNav(!mobileNav)}><Menu size={21} /></button><div className="crumb"><span>驿站工作台</span><ChevronRight size={14} /><b>{view === 'packages' ? '我的包裹' : view === 'sources' ? '数据来源' : '账号设置'}</b></div><div className="top-actions" ref={accountAreaRef}><button className="icon-btn dot" type="button" aria-label="查看提醒" onClick={() => toast('暂无新的未读提醒')}><Bell size={18} /></button><button className="account-chip" type="button" aria-haspopup="menu" aria-expanded={accountMenuOpen} aria-label={`打开账号菜单，当前账号 ${maskEmail(user.email)}`} onClick={toggleAccountMenu}><span className="avatar small">{avatarText(user.email)}</span><span>{maskEmail(user.email)}</span><ChevronRight size={14} /></button>{accountMenuOpen && <div className="account-menu" role="menu"><div className="account-menu-user"><span className="avatar small">{avatarText(user.email)}</span><div><b>{maskEmail(user.email)}</b><small>当前登录账号</small></div></div><button type="button" role="menuitem" onClick={openAccountSettings}><Settings2 size={15} />账号设置<ChevronRight size={14} /></button><button type="button" role="menuitem" onClick={() => void logout()}><LogOut size={15} />退出当前账号</button></div>}</div></header>
         <div className="content">
-          {view === 'packages' && <Packages parcels={parcels} filtered={filtered} filter={filter} setFilter={setFilter} query={query} setQuery={setQuery} trackingNumber={trackingNumber} setTrackingNumber={setTrackingNumber} waiting={waiting} transit={transit} connected={connected} syncing={syncing} lastSync={lastSync} onSync={sync} visible={visible} setVisible={setVisible} onOpen={setSelectedId} onCopy={copy} onConfirm={confirm} />}
-          {view === 'sources' && <Sources connected={connected} onConnect={(provider) => toast(`${provider.name} 支持按运单号自动识别，无需单独授权`)} />}
-          {view === 'settings' && <Settings email={user.email} passwordSet={Boolean(user.passwordSet)} autoSync={autoSync} push={push} setAutoSync={setAutoSync} setPush={setPush} onLogout={logout} onSetPassword={() => setPasswordSetupOpen(true)} />}
+          {view === 'packages' && <Packages parcels={parcels} filtered={filtered} filter={filter} setFilter={setFilter} query={query} setQuery={setQuery} trackingNumber={trackingNumber} setTrackingNumber={setTrackingNumber} waiting={waiting} transit={transit} connected={connected} syncing={syncing} lastSync={lastSync} onSync={sync} onViewSources={() => { setView('sources'); setAccountMenuOpen(false) }} visible={visible} setVisible={setVisible} onOpen={setSelectedId} onCopy={copy} onConfirm={confirm} confirmingId={confirmingId} />}
+          {view === 'sources' && <Sources connected={connected} onExplain={toast} />}
+          {view === 'settings' && <Settings email={user.email} passwordSet={Boolean(user.passwordSet)} autoSync={autoSync} push={push} setAutoSync={setAutoSync} setPush={setPush} onPreferenceSaved={() => toast('偏好设置已保存到本设备')} onLogout={logout} onSetPassword={() => setPasswordSetupOpen(true)} />}
         </div>
       </main>
-      {selected && <Drawer parcel={selected} shown={Boolean(visible[selected.id])} toggle={() => setVisible((items) => ({ ...items, [selected.id]: !items[selected.id] }))} onCopy={copy} onClose={() => setSelectedId(null)} onConfirm={confirm} />}
+      {selected && <Drawer parcel={selected} shown={Boolean(visible[selected.id])} toggle={() => setVisible((items) => ({ ...items, [selected.id]: !items[selected.id] }))} onCopy={copy} onClose={() => setSelectedId(null)} onConfirm={confirm} confirming={confirmingId === selected.id} />}
       {passwordSetupOpen && <SetPasswordModal busy={passwordSetupBusy} onClose={() => { if (!passwordSetupBusy) setPasswordSetupOpen(false) }} onSubmit={handleSetPassword} />}
-      {modal && <LoginModal view={authView} setView={changeAuthView} mode={authMode} setMode={changeAuthMode} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onSubmit={submitAuth} onNotice={toast} onSendCode={sendCode} busy={authBusy} demoMode={demoAuthEnabled} backendUnavailable={false} onClose={() => setModal(false)} onLogout={logout} />}
       {notice && <div className="toast" role="status" aria-live="polite"><CircleCheck size={17} />{notice}</div>}
     </div>
   )
@@ -305,37 +388,42 @@ function Header({ kicker, title, text, action }: { kicker: ReactNode; title: Rea
   return <section className="heading"><div><div className="eyebrow">{kicker}</div><h1>{title}</h1><p>{text}</p></div>{action}</section>
 }
 
-function Packages({ parcels, filtered, filter, setFilter, query, setQuery, trackingNumber, setTrackingNumber, waiting, transit, connected, syncing, lastSync, onSync, visible, setVisible, onOpen, onCopy, onConfirm }: { parcels: Parcel[]; filtered: Parcel[]; filter: Filter; setFilter: (value: Filter) => void; query: string; setQuery: (value: string) => void; trackingNumber: string; setTrackingNumber: (value: string) => void; waiting: number; transit: number; connected: number; syncing: boolean; lastSync: string; onSync: () => void; visible: Record<string, boolean>; setVisible: React.Dispatch<React.SetStateAction<Record<string, boolean>>>; onOpen: (id: string) => void; onCopy: (code: string) => void; onConfirm: (parcel: Parcel) => void }) {
+function Packages({ parcels, filtered, filter, setFilter, query, setQuery, trackingNumber, setTrackingNumber, waiting, transit, connected, syncing, lastSync, onSync, onViewSources, visible, setVisible, onOpen, onCopy, onConfirm, confirmingId }: { parcels: Parcel[]; filtered: Parcel[]; filter: Filter; setFilter: (value: Filter) => void; query: string; setQuery: (value: string) => void; trackingNumber: string; setTrackingNumber: (value: string) => void; waiting: number; transit: number; connected: number; syncing: boolean; lastSync: string; onSync: () => void; onViewSources: () => void; visible: Record<string, boolean>; setVisible: React.Dispatch<React.SetStateAction<Record<string, boolean>>>; onOpen: (id: string) => void; onCopy: (code: string) => void; onConfirm: (parcel: Parcel) => void | Promise<void>; confirmingId: string | null }) {
+  const trackingInputRef = useRef<HTMLInputElement>(null)
+  const hasParcels = parcels.length > 0
+
   return <>
-    <Header kicker={<><Sparkles size={14} /> 运单号查件</>} title={<>你的包裹，<span>一眼就够了。</span></>} text={parcels.length ? `已同步 ${parcels.length} 个包裹，最后更新于 ${lastSync}。` : '输入快递运单号，自动识别快递公司后查询真实物流状态和轨迹。'} action={<button className={`sync-btn ${syncing ? 'syncing' : ''}`} onClick={onSync} disabled={syncing}><RefreshCw size={17} />{syncing ? '查询中…' : '重新查询'}</button>} />
+    <Header kicker={<><Sparkles size={14} /> 运单号查件</>} title={<>你的包裹，<span>一眼就够了。</span></>} text={hasParcels ? `已保存 ${parcels.length} 个包裹，最后更新于 ${lastSync}。` : '输入快递运单号，自动识别承运商后查询并保存物流状态。'} action={<button className={`sync-btn ${syncing ? 'syncing' : ''}`} onClick={onSync} disabled={syncing || !trackingNumber.trim()}><RefreshCw size={17} />{syncing ? '查询中…' : hasParcels ? '更新物流' : '查询快递'}</button>} />
     <form className="tracking-query" onSubmit={(event) => { event.preventDefault(); onSync() }}>
-      <div><span><Package size={18} /></span><label htmlFor="parcel-tracking"><b>运单号查快递</b><small>手动输入或粘贴运单号；系统会自动识别快递公司，仅同步当前登录账号的物流记录。</small></label></div>
-      <input id="parcel-tracking" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value.replace(/\s/g, '').slice(0, 128))} autoComplete="off" placeholder="请输入快递运单号" maxLength={128} />
+      <div><span><Package size={18} /></span><label htmlFor="parcel-tracking"><b>运单号查快递</b><small>手动输入或粘贴运单号；系统会自动识别快递公司，仅保存到当前登录账号的物流记录。</small></label></div>
+      <input id="parcel-tracking" ref={trackingInputRef} value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value.replace(/\s/g, '').slice(0, 128))} autoComplete="off" placeholder="请输入快递运单号" maxLength={128} />
       <button type="submit" disabled={syncing}>{syncing ? '查询中…' : '查询快递'}</button>
     </form>
-    <section className="summary"><div className="hero"><div className="orb one" /><div className="orb two" /><div className="hero-copy"><div className="hero-kicker"><i /> 快递状态已自动更新</div><h2>{waiting ? `有 ${waiting} 个包裹，正在等你取件` : '今天没有待取件包裹'}</h2><p>{waiting ? '取件码只会在你的账号内展示，确认取件后会自动删除。' : '所有包裹都已处理完毕，继续保持轻松。'}</p><div className="stats"><div><b>{waiting}</b><span>待取件</span></div><div><b>{transit}</b><span>运输中</span></div><div><b>{connected}</b><span>已连接平台</span></div></div></div><div className="hero-art"><div><Package size={29} /><small>包裹状态</small><b>实时同步</b></div><span><Check size={14} /></span></div></div><div className="trust"><div className="trust-title"><span><ShieldCheck size={19} /></span>安心提示</div><h3>你的数据，只为你服务</h3><p>运单号仅用于服务端查询并关联当前登录账号；取件码仅在服务商明确返回时展示，不会出现在推送通知里。</p><footer><span><LockKeyhole size={14} /> 加密存储</span><span><Zap size={14} /> 自动清理</span></footer></div></section>
-    <div className="section-head"><div><h2>包裹列表</h2><span>{filtered.length} 个结果</span></div><div className="section-tools"><label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索平台、包裹或单号" /></label><button className="sync-label"><Zap size={15} /> 自动同步中</button></div></div>
+    <section className="summary"><div className="hero"><div className="orb one" /><div className="orb two" /><div className="hero-copy"><div className="hero-kicker"><i /> 查询记录已保存</div><h2>{waiting ? `有 ${waiting} 个包裹，正在等你取件` : hasParcels ? '当前没有待取件包裹' : '从第一个运单号开始'}</h2><p>{waiting ? '取件码只会在你的账号内展示，确认取件后会自动删除。' : hasParcels ? '输入新的运单号即可继续添加包裹。' : '查询结果会保存到当前账号，方便你下次继续查看。'}</p><div className="stats"><div><b>{waiting}</b><span>待取件</span></div><div><b>{transit}</b><span>运输中</span></div><div><b>{connected}</b><span>已查询承运商</span></div></div></div><div className="hero-art"><div><Package size={29} /><small>包裹状态</small><b>查询后保存</b></div><span><Check size={14} /></span></div></div><div className="trust"><div className="trust-title"><span><ShieldCheck size={19} /></span>安心提示</div><h3>你的数据，只为你服务</h3><p>运单号仅用于服务端查询并关联当前登录账号；取件码仅在服务商明确返回时展示，不会出现在推送通知里。</p><footer><span><LockKeyhole size={14} /> 加密存储</span><span><Zap size={14} /> 确认后清理</span></footer></div></section>
+    <div className="section-head"><div><h2>包裹列表</h2><span>{filtered.length} 个结果</span></div><div className="section-tools"><label className="search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索平台、包裹或单号" /></label><span className="sync-label"><Zap size={15} /> 查询后自动保存</span></div></div>
     <div className="tabs">{(['全部', '待取件', '运输中', '已完成'] as Filter[]).map((item) => <button key={item} className={filter === item ? 'active' : ''} onClick={() => setFilter(item)}>{item}{item !== '全部' && <em>{parcels.filter((parcel) => parcel.status === item).length}</em>}</button>)}</div>
-    {filtered.length ? <div className="parcel-grid">{filtered.map((parcel) => <Card key={parcel.id} parcel={parcel} shown={Boolean(visible[parcel.id])} toggle={() => setVisible((items) => ({ ...items, [parcel.id]: !items[parcel.id] }))} onOpen={() => onOpen(parcel.id)} onCopy={onCopy} onConfirm={onConfirm} />)}</div> : <div className="empty"><Search size={24} /><strong>没有找到匹配的包裹</strong><span>试试搜索其他平台或运单号。</span></div>}
-    <div className="integration"><div className="integration-icon"><CircleAlert size={18} /></div><div><strong>数据接入说明</strong><p>用户手动提交运单号后，服务端查询真实轨迹并保存到当前账号。取件码仅在已开通取件码数据服务且服务商返回时展示，不会根据运单号猜测。</p></div><button onClick={() => window.alert('请在“数据来源”中查看授权状态。')}>查看授权 <ArrowUpRight size={15} /></button></div>
+    {!hasParcels ? <div className="empty empty-first"><Package size={24} /><strong>还没有包裹记录</strong><span>输入一个运单号，开始查询并保存物流信息。</span><button className="empty-action" type="button" onClick={() => trackingInputRef.current?.focus()}>查询第一个包裹 <ChevronRight size={14} /></button></div> : filtered.length ? <div className="parcel-grid">{filtered.map((parcel) => <Card key={parcel.id} parcel={parcel} shown={Boolean(visible[parcel.id])} toggle={() => setVisible((items) => ({ ...items, [parcel.id]: !items[parcel.id] }))} onOpen={() => onOpen(parcel.id)} onCopy={onCopy} onConfirm={onConfirm} confirming={confirmingId === parcel.id} />)}</div> : <div className="empty"><Search size={24} /><strong>没有找到匹配的包裹</strong><span>试试搜索其他平台、包裹名称或运单号。</span></div>}
+    <div className="integration"><div className="integration-icon"><CircleAlert size={18} /></div><div><strong>查询说明</strong><p>输入运单号后，系统会自动识别承运商，查询真实物流并保存到当前账号。取件码仅在上游明确返回时展示，不会根据运单号猜测。</p></div><button onClick={onViewSources}>查看查询方式 <ArrowUpRight size={15} /></button></div>
   </>
 }
 
-function Card({ parcel, shown, toggle, onOpen, onCopy, onConfirm }: { parcel: Parcel; shown: boolean; toggle: () => void; onOpen: () => void; onCopy: (code: string) => void; onConfirm: (parcel: Parcel) => void }) {
+function Card({ parcel, shown, toggle, onOpen, onCopy, onConfirm, confirming }: { parcel: Parcel; shown: boolean; toggle: () => void; onOpen: () => void; onCopy: (code: string) => void; onConfirm: (parcel: Parcel) => void | Promise<void>; confirming: boolean }) {
   const waiting = parcel.status === '待取件'
-  return <article className={`parcel ${waiting ? 'waiting' : ''}`} style={cssVars(parcel.color, parcel.pale)}><div className="parcel-head"><div className="carrier"><Truck size={19} /></div><div className="carrier-copy"><b>{parcel.carrier}</b><span>{parcel.tracking}</span></div><Pill status={parcel.status} /></div><button className="parcel-main" onClick={onOpen}><div><h3>{parcel.title}</h3><p>{parcel.route}</p></div><ChevronRight size={18} /></button><div className="meta"><span><MapPin size={14} />{parcel.location}</span><span><Clock3 size={14} />{parcel.updated}</span></div>{waiting && parcel.code ? <div className="code-panel"><div className="code-top"><span><PackageCheck size={15} /> 取件码</span><small><ShieldCheck size={13} /> 仅本人可见</small></div><div className="code-row"><b>{shown ? parcel.code : '•••-•••'}</b><button onClick={toggle}><Eye size={16} /></button>{shown && <button onClick={() => onCopy(parcel.code ?? '')}><Copy size={16} /></button>}</div><small className="spot">{parcel.spot}</small></div> : <div className="card-foot"><span><i className={parcel.status === '已完成' ? 'done' : ''} />{parcel.eta}</span><button onClick={onOpen}>查看轨迹 <ChevronRight size={14} /></button></div>}{waiting && <div className="card-actions"><button onClick={onOpen}>查看完整轨迹 <ChevronRight size={14} /></button><button onClick={() => onConfirm(parcel)}><Check size={15} /> 我已取件</button></div>}</article>
+  return <article className={`parcel ${waiting ? 'waiting' : ''}`} style={cssVars(parcel.color, parcel.pale)}><div className="parcel-head"><div className="carrier"><Truck size={19} /></div><div className="carrier-copy"><b>{parcel.carrier}</b><span>{parcel.tracking}</span></div><Pill status={parcel.status} /></div><button className="parcel-main" onClick={onOpen}><div><h3>{parcel.title}</h3><p>{parcel.route}</p></div><ChevronRight size={18} /></button><div className="meta"><span><MapPin size={14} />{parcel.location}</span><span><Clock3 size={14} />{parcel.updated}</span></div>{waiting && parcel.code ? <div className="code-panel"><div className="code-top"><span><PackageCheck size={15} /> 取件码</span><small><ShieldCheck size={13} /> 仅本人可见</small></div><div className="code-row"><b>{shown ? parcel.code : '•••-•••'}</b><button onClick={toggle}><Eye size={16} /></button>{shown && <button onClick={() => onCopy(parcel.code ?? '')}><Copy size={16} /></button>}</div><small className="spot">{parcel.spot}</small></div> : <div className="card-foot"><span><i className={parcel.status === '已完成' ? 'done' : ''} />{parcel.eta}</span><button onClick={onOpen}>查看轨迹 <ChevronRight size={14} /></button></div>}{waiting && <div className="card-actions"><button onClick={onOpen}>查看完整轨迹 <ChevronRight size={14} /></button><button disabled={confirming} onClick={() => void onConfirm(parcel)}><Check size={15} /> {confirming ? '保存中…' : '我已取件'}</button></div>}</article>
 }
 
 function Pill({ status }: { status: Status }) { return <span className={`pill ${status === '待取件' ? 'wait' : status === '运输中' ? 'transit' : 'done'}`}>{status === '待取件' ? <PackageCheck size={13} /> : status === '运输中' ? <Truck size={13} /> : <Check size={13} />}{status}</span> }
-function Sources({ connected, onConnect }: { connected: number; onConnect: (provider: Provider) => void }) {
-  return <><Header kicker={<><Link2 size={14} /> 授权管理</>} title={<>数据来源，<span>由你决定。</span></>} text={`已查询 ${connected} 个平台，输入运单号后会自动识别承运商并保存到你的包裹列表。`} action={<button className="outline-btn"><Clipboard size={16} /> 授权说明</button>} /><section className="source-banner"><div className="source-icon"><ShieldCheck size={24} /></div><div><strong>我们不会通过邮箱地址猜测包裹</strong><p>每个来源都需要通过官方或授权的接口完成验证，取件码只会在授权有效时展示。</p></div><span className="secure"><i /> 连接安全</span></section><div className="section-head"><div><h2>支持的平台</h2><span>支持自动识别的主流承运商</span></div><div className="source-count"><b>{connected}</b><span>个已查询</span></div></div><div className="provider-grid">{providerList.map((provider) => <article className="provider" key={provider.name} style={cssVars(provider.color, provider.pale)}><div className="provider-top"><span>{provider.short.slice(0, 1)}</span>{provider.connected ? <b><CircleCheck size={14} /> 可查询</b> : <small>按单号识别</small>}</div><h3>{provider.name}</h3><p>{provider.description}</p>{provider.connected ? <footer><span><RefreshCw size={13} /> {provider.synced}查询</span><button onClick={() => onConnect(provider)}>查看说明 <ChevronRight size={14} /></button></footer> : <button className="connect" onClick={() => onConnect(provider)}><Link2 size={15} /> 查看支持范围</button>}</article>)}</div><section className="how"><div className="section-head"><div><h2>授权流程</h2><span>三步完成安全接入</span></div></div><div className="steps"><Step no="01" icon={<Smartphone size={18} />} title="验证邮箱地址" text="确认这是你本人正在使用的邮箱地址。" /><Step no="02" icon={<Link2 size={18} />} title="授权数据来源" text="只选择你愿意同步的快递平台。" /><Step no="03" icon={<PackageCheck size={18} />} title="开始自动同步" text="到站后提醒，取件后自动清理取件码。" /></div></section></>
+function Sources({ connected, onExplain }: { connected: number; onExplain: (message: string) => void }) {
+  return <><Header kicker={<><Link2 size={14} /> 查询方式</>} title={<>数据来源，<span>清楚可见。</span></>} text={`已查询 ${connected} 个承运商；输入运单号后会自动识别并保存物流记录。`} action={<button className="outline-btn" onClick={() => onExplain('输入运单号后，驿见会自动识别承运商并查询物流；当前不需要单独绑定快递账号。')}><Clipboard size={16} /> 查询说明</button>} /><section className="source-banner"><div className="source-icon"><ShieldCheck size={24} /></div><div><strong>不通过邮箱地址猜测你的包裹</strong><p>只有你手动提交运单号后，系统才会查询并保存对应物流记录。</p></div><span className="secure"><i /> 服务端查询</span></section><div className="section-head"><div><h2>支持识别的承运商</h2><span>查询时会自动判断快递公司</span></div><div className="source-count"><b>{connected}</b><span>个已查询</span></div></div><div className="provider-grid">{providerList.map((provider) => <article className="provider" key={provider.name} style={cssVars(provider.color, provider.pale)}><div className="provider-top"><span>{provider.short.slice(0, 1)}</span>{provider.connected ? <b><CircleCheck size={14} /> 可识别</b> : <small>按单号识别</small>}</div><h3>{provider.name}</h3><p>{provider.description.replace('自动识别', '单号识别').replace('状态同步', '状态保存')}</p>{provider.connected ? <footer><span><RefreshCw size={13} /> 支持查询</span><button onClick={() => onExplain(`${provider.name}会在你提交运单号后自动识别，不需要单独授权。`)}>查看说明 <ChevronRight size={14} /></button></footer> : <button className="connect" onClick={() => onExplain(`${provider.name}会在你提交运单号后参与识别，具体支持范围以快递100返回结果为准。`)}><Link2 size={15} /> 查看支持范围</button>}</article>)}</div><section className="how"><div className="section-head"><div><h2>查询流程</h2><span>输入一个运单号即可开始</span></div></div><div className="steps"><Step no="01" icon={<Package size={18} />} title="输入运单号" text="提交你要查询的快递运单号。" /><Step no="02" icon={<Search size={18} />} title="自动识别承运商" text="服务端识别快递公司并查询真实轨迹。" /><Step no="03" icon={<PackageCheck size={18} />} title="保存到我的包裹" text="查询结果保存到当前账号，方便下次继续查看。" /></div></section></>
 }
 function Step({ no, icon, title, text }: { no: string; icon: ReactNode; title: string; text: string }) { return <div className="step"><small>{no}</small><div>{icon}</div><strong>{title}</strong><p>{text}</p></div> }
 
-function Settings({ email, passwordSet, autoSync, push, setAutoSync, setPush, onLogout, onSetPassword }: { email: string; passwordSet: boolean; autoSync: boolean; push: boolean; setAutoSync: (value: boolean) => void; setPush: (value: boolean) => void; onLogout: () => void; onSetPassword: () => void }) {
-  return <><Header kicker={<><Settings2 size={14} /> 账号与偏好</>} title={<>把体验调成，<span>你喜欢的样子。</span></>} text="账号安全、同步频率和隐私策略，都可以在这里管理。" /><div className="settings-grid"><section className="settings"><div className="settings-title"><div><small>账号信息</small><h2>登录与安全</h2></div><span><LockKeyhole size={18} /></span></div><div className="profile"><span className="avatar large">{avatarText(email)}</span><div><b>已验证邮箱地址</b><small>{maskEmail(email)}</small></div><em><Check size={13} /> 已验证</em></div><div className="setting-row"><div><b>登录方式</b><small>{passwordSet ? '邮箱验证码 · 密码登录均可用' : '当前仅支持验证码登录，建议设置密码'}</small></div>{passwordSet ? <button disabled>已设置 <Check size={15} /></button> : <button onClick={onSetPassword}>设置密码 <ChevronRight size={15} /></button>}</div><div className="setting-row"><div><b>授权设备</b><small>当前设备 · 最后活跃刚刚</small></div><button>查看 <ChevronRight size={15} /></button></div><button className="logout" onClick={onLogout}><LogOut size={15} /> 退出当前账号</button></section><section className="settings"><div className="settings-title"><div><small>同步与提醒</small><h2>让更新自动发生</h2></div><span className="warm"><Zap size={18} /></span></div><Toggle icon={<RefreshCw size={17} />} title="后台自动同步" text="定期检查授权平台的最新状态" enabled={autoSync} onToggle={() => setAutoSync(!autoSync)} /><Toggle icon={<Bell size={17} />} title="到站提醒" text="推送提醒，但不展示完整取件码" enabled={push} onToggle={() => setPush(!push)} /><div className="rule"><ShieldCheck size={17} /><div><b>取件码删除规则</b><p>点击“我已取件”后立即删除；若一直未确认，最多保留 30 天。</p></div></div></section></div><div className="footnote"><CircleAlert size={17} /> 当前为交互演示环境，真实上线时会将授权凭证放在服务端加密存储，前端不会接触平台密钥。</div></>
+function Settings({ email, passwordSet, autoSync, push, setAutoSync, setPush, onPreferenceSaved, onLogout, onSetPassword }: { email: string; passwordSet: boolean; autoSync: boolean; push: boolean; setAutoSync: (value: boolean) => void; setPush: (value: boolean) => void; onPreferenceSaved: () => void; onLogout: () => void; onSetPassword: () => void }) {
+  return <><Header kicker={<><Settings2 size={14} /> 账号与偏好</>} title={<>把体验调成，<span>你喜欢的样子。</span></>} text="账号安全、查询方式和取件码规则，都可以在这里查看。" /><div className="settings-grid"><section className="settings"><div className="settings-title"><div><small>账号信息</small><h2>登录与安全</h2></div><span><LockKeyhole size={18} /></span></div><div className="profile"><span className="avatar large">{avatarText(email)}</span><div><b>已验证邮箱地址</b><small>{maskEmail(email)}</small></div><em><Check size={13} /> 已验证</em></div><div className="setting-row"><div><b>登录方式</b><small>{passwordSet ? '邮箱验证码 · 密码登录均可用' : '当前仅支持验证码登录，建议设置密码'}</small></div>{passwordSet ? <span className="setting-status">已设置</span> : <button type="button" onClick={onSetPassword}>设置密码 <ChevronRight size={15} /></button>}</div><div className="setting-row"><div><b>登录设备</b><small>当前设备 · 最后活跃刚刚</small></div><span className="setting-status">当前设备</span></div><button className="logout" type="button" onClick={onLogout}><LogOut size={15} /> 退出当前账号</button></section><section className="settings"><div className="settings-title"><div><small>查询与提醒</small><h2>偏好设置</h2></div><span className="warm"><Zap size={18} /></span></div><Toggle icon={<RefreshCw size={17} />} title="后台自动同步" text="偏好已保存；服务端同步功能开放后生效" enabled={autoSync} onToggle={() => { setAutoSync(!autoSync); onPreferenceSaved() }} /><Toggle icon={<Bell size={17} />} title="到站提醒" text="偏好已保存；通知服务开放后生效" enabled={push} onToggle={() => { setPush(!push); onPreferenceSaved() }} /><div className="rule"><ShieldCheck size={17} /><div><b>取件码删除规则</b><p>点击“我已取件”并保存成功后立即删除；若一直未确认，最多保留 30 天。</p></div></div></section></div><div className="footnote"><CircleAlert size={17} /> 偏好设置保存在本设备；物流记录仍保存到当前登录账号。</div></>
 }
-function Toggle({ icon, title, text, enabled, onToggle }: { icon: ReactNode; title: string; text: string; enabled: boolean; onToggle: () => void }) { return <div className="toggle-row"><span>{icon}</span><div><b>{title}</b><small>{text}</small></div><button className={`toggle ${enabled ? 'on' : ''}`} onClick={onToggle}><i /></button></div> }
+function Toggle({ icon, title, text, enabled, onToggle }: { icon: ReactNode; title: string; text: string; enabled: boolean; onToggle: () => void }) {
+  return <div className="toggle-row"><span>{icon}</span><div><b>{title}</b><small>{text}</small></div><button className={`toggle ${enabled ? 'on' : ''}`} type="button" aria-label={`${title}${enabled ? '已开启' : '已关闭'}`} aria-pressed={enabled} onClick={onToggle}><i /></button></div>
+}
 
 function SetPasswordModal({ busy, onClose, onSubmit }: { busy: boolean; onClose: () => void; onSubmit: (password: string) => void }) {
   const [password, setPasswordValue] = useState('')
@@ -352,8 +440,8 @@ function SetPasswordModal({ busy, onClose, onSubmit }: { busy: boolean; onClose:
   return <div className="modal-layer" onClick={() => { if (!busy) onClose() }}><section className="login-modal password-setup-modal" role="dialog" aria-modal="true" aria-labelledby="password-setup-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" aria-label="关闭设置密码" onClick={onClose}><X size={18} /></button><div className="modal-icon"><KeyRound size={20} /></div><small>账号安全</small><h2 id="password-setup-title">设置登录密码</h2><p>设置后可以跳过验证码，使用邮箱和密码快速登录。</p><form className="auth-form" onSubmit={submit} noValidate><label htmlFor="setup-password">新密码<div className="password-input"><KeyRound size={16} /><input id="setup-password" value={password} onChange={(event) => setPasswordValue(event.target.value)} type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={6} maxLength={128} required placeholder="请输入 6-128 位密码" />{password && <button type="button" className="password-toggle" aria-label={showPassword ? '隐藏密码' : '显示密码'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>}</div></label><label htmlFor="setup-password-confirm">确认新密码<div className="password-input"><KeyRound size={16} /><input id="setup-password-confirm" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={6} maxLength={128} required placeholder="请再次输入密码" /></div></label>{error && <small className="auth-hint auth-error" role="alert">{error}</small>}<button className="submit" type="submit" disabled={busy}>{busy ? <RefreshCw size={17} className="spin" /> : <Check size={17} />} {busy ? '保存中…' : '保存密码'}</button></form><div className="drawer-note"><ShieldCheck size={15} />密码会在服务端加密保存，不会显示在通知中。</div></section></div>
 }
 
-function Drawer({ parcel, shown, toggle, onCopy, onClose, onConfirm }: { parcel: Parcel; shown: boolean; toggle: () => void; onCopy: (code: string) => void; onClose: () => void; onConfirm: (parcel: Parcel) => void }) {
-  return <div className="drawer-layer" onClick={onClose}><aside className="drawer" onClick={(event) => event.stopPropagation()}><div className="drawer-head"><div><small>包裹详情</small><h2>{parcel.title}</h2></div><button className="icon-btn" onClick={onClose}><X size={18} /></button></div><div className="drawer-carrier"><span className="carrier" style={cssVars(parcel.color, parcel.pale)}><Truck size={19} /></span><div><b>{parcel.carrier}</b><small>{parcel.tracking}</small></div><Pill status={parcel.status} /></div>{parcel.code ? <div className="drawer-code"><div><span>取件码</span><small>{parcel.spot}</small></div><strong>{shown ? parcel.code : '•••-•••'}</strong><button onClick={toggle}><Eye size={16} /></button>{shown && <button onClick={() => onCopy(parcel.code ?? '')}><Copy size={16} /></button>}</div> : <div className="drawer-status"><span><Truck size={18} /></span><div><b>{parcel.eta}</b><small>{parcel.location}</small></div></div>}<TrailMap events={parcel.events} /><div className="timeline"><header><b>文字轨迹</b><small>{parcel.events.length} 条记录</small></header>{parcel.events.map((event, index) => <div className={`event ${event.active ? 'active' : ''}`} key={`${event.time}-${index}`}><i /><div><div><b>{event.title}</b><time>{event.time}</time></div><p>{event.text}</p></div></div>)}</div>{parcel.code && <button className="drawer-confirm" onClick={() => onConfirm(parcel)}><Check size={16} /> 我已取件，删除取件码</button>}<div className="drawer-note"><ShieldCheck size={15} />取件码只在你的账号内展示；确认取件后立即从系统删除。</div></aside></div>
+function Drawer({ parcel, shown, toggle, onCopy, onClose, onConfirm, confirming }: { parcel: Parcel; shown: boolean; toggle: () => void; onCopy: (code: string) => void; onClose: () => void; onConfirm: (parcel: Parcel) => void | Promise<void>; confirming: boolean }) {
+  return <div className="drawer-layer" onClick={onClose}><aside className="drawer" onClick={(event) => event.stopPropagation()}><div className="drawer-head"><div><small>包裹详情</small><h2>{parcel.title}</h2></div><button className="icon-btn" onClick={onClose}><X size={18} /></button></div><div className="drawer-carrier"><span className="carrier" style={cssVars(parcel.color, parcel.pale)}><Truck size={19} /></span><div><b>{parcel.carrier}</b><small>{parcel.tracking}</small></div><Pill status={parcel.status} /></div>{parcel.code ? <div className="drawer-code"><div><span>取件码</span><small>{parcel.spot}</small></div><strong>{shown ? parcel.code : '•••-•••'}</strong><button onClick={toggle}><Eye size={16} /></button>{shown && <button onClick={() => onCopy(parcel.code ?? '')}><Copy size={16} /></button>}</div> : <div className="drawer-status"><span><Truck size={18} /></span><div><b>{parcel.eta}</b><small>{parcel.location}</small></div></div>}<TrailMap events={parcel.events} /><div className="timeline"><header><b>文字轨迹</b><small>{parcel.events.length} 条记录</small></header>{parcel.events.map((event, index) => <div className={`event ${event.active ? 'active' : ''}`} key={`${event.time}-${index}`}><i /><div><div><b>{event.title}</b><time>{event.time}</time></div><p>{event.text}</p></div></div>)}</div>{parcel.code && <button className="drawer-confirm" disabled={confirming} onClick={() => void onConfirm(parcel)}><Check size={16} /> {confirming ? '保存中…' : '我已取件，删除取件码'}</button>}<div className="drawer-note"><ShieldCheck size={15} />取件码只在你的账号内展示；确认取件后立即从系统删除。</div></aside></div>
 }
 
 function TrailMap({ events }: { events: Event[] }) {
@@ -395,12 +483,14 @@ function AuthForm({ view, setView, mode, setMode, email, setEmail, password, set
   const [showPassword, setShowPassword] = useState(false)
   const [lastSentEmail, setLastSentEmail] = useState('')
   const [sendCodeError, setSendCodeError] = useState('')
+  const [sendCodeErrorCode, setSendCodeErrorCode] = useState('')
 
   useEffect(() => {
     if (countdown <= 0) return
     const timer = window.setInterval(() => setCountdown((value) => Math.max(value - 1, 0)), 1000)
     return () => window.clearInterval(timer)
   }, [countdown])
+
 
   const handleSendCode = async () => {
     if (sendingCode || countdown > 0 || busy) return
@@ -410,6 +500,7 @@ function AuthForm({ view, setView, mode, setMode, email, setEmail, password, set
       return
     }
     setSendCodeError('')
+    setSendCodeErrorCode('')
     setSendingCode(true)
     try {
       const result = await onSendCode(normalizedEmail, isRegistering ? 'register' : 'login')
@@ -418,6 +509,7 @@ function AuthForm({ view, setView, mode, setMode, email, setEmail, password, set
         setLastSentEmail(normalizedEmail)
       } else {
         setSendCodeError(result.message ?? '验证码发送失败，请稍后重试')
+        setSendCodeErrorCode(result.code ?? '')
       }
     } finally {
       setSendingCode(false)
@@ -434,11 +526,11 @@ function AuthForm({ view, setView, mode, setMode, email, setEmail, password, set
   const switchMode = (nextMode: AuthMode) => setMode(nextMode)
 
   return <form className="auth-form" onSubmit={handleSubmit} aria-busy={busy} noValidate>
-    <div className="auth-form-heading"><div><b>{isRegistering ? '创建你的账号' : '登录账号'}</b><small>{isRegistering ? '验证邮箱，开始同步你的快递' : '使用邮箱进入你的包裹空间'}</small></div>{isRegistering && <span className="new-account-tag">新用户</span>}</div>
+    <div className="auth-form-heading"><div><b>{isRegistering ? '创建你的账号' : '登录账号'}</b><small>{isRegistering ? '验证邮箱，开始查询你的快递' : '使用邮箱进入你的包裹空间'}</small></div>{isRegistering && <span className="new-account-tag">新用户</span>}</div>
     {backendUnavailable && <div className="auth-status-note" role="status"><CircleAlert size={15} /><span>{demoMode ? '后端暂未连接，当前可用本地演示验证码 123456' : '认证服务暂时不可用，请稍后重试'}</span></div>}
-    <div className="auth-tabs" role="tablist" aria-label="登录方式"><button type="button" role="tab" aria-selected={mode === 'code'} className={mode === 'code' ? 'active' : ''} onClick={() => switchMode('code')}>{isRegistering ? '邮箱验证码注册' : '邮箱验证码登录'}</button><button type="button" role="tab" aria-selected={mode === 'password'} className={mode === 'password' ? 'active' : ''} onClick={() => switchMode('password')}>{isRegistering ? '密码注册' : '密码登录'}</button></div>
-    <label htmlFor="auth-email">邮箱地址<input id="auth-email" value={email} onChange={(event) => { setEmail(event.target.value); setSendCodeError('') }} type="email" autoComplete="email" placeholder="请输入邮箱地址" required /></label>
-    {(mode === 'code' || isRegistering) && <label htmlFor="auth-code">邮箱验证码<div className="code-input"><input id="auth-code" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="输入 6 位验证码" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required /><button type="button" disabled={countdown > 0 || sendingCode || busy} onClick={() => void handleSendCode()}>{sendingCode ? '发送中…' : countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}</button></div>{lastSentEmail && <small className="auth-hint" role="status">验证码已发送到 {maskEmail(lastSentEmail)}，5 分钟内有效</small>}{sendCodeError && <small className="auth-hint auth-error" role="alert">{sendCodeError}</small>}</label>}
+    {!isRegistering && <div className="auth-tabs" role="tablist" aria-label="登录方式"><button type="button" role="tab" aria-selected={mode === 'code'} className={mode === 'code' ? 'active' : ''} onClick={() => switchMode('code')}>邮箱验证码登录</button><button type="button" role="tab" aria-selected={mode === 'password'} className={mode === 'password' ? 'active' : ''} onClick={() => switchMode('password')}>密码登录</button></div>}
+    <label htmlFor="auth-email">邮箱地址<input id="auth-email" value={email} onChange={(event) => { setEmail(event.target.value); setSendCodeError(''); setSendCodeErrorCode('') }} type="email" autoComplete="email" placeholder="请输入邮箱地址" required /></label>
+    {(mode === 'code' || isRegistering) && <label htmlFor="auth-code">邮箱验证码<div className="code-input"><input id="auth-code" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="输入 6 位验证码" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required /><button type="button" disabled={countdown > 0 || sendingCode || busy} onClick={() => void handleSendCode()}>{sendingCode ? '发送中…' : countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}</button></div>{lastSentEmail && <small className="auth-hint" role="status">验证码已发送到 {maskEmail(lastSentEmail)}，5 分钟内有效</small>}{sendCodeError && <small className="auth-hint auth-error" role="alert">{sendCodeError}</small>}{sendCodeErrorCode === 'EMAIL_NOT_REGISTERED' && !isRegistering && <button className="auth-error-action" type="button" onClick={switchView}>注册这个邮箱</button>}</label>}
     {(mode === 'password' || isRegistering) && <label htmlFor="auth-password">{isRegistering ? '设置登录密码' : '登录密码'}<div className="password-input"><KeyRound size={16} /><input id="auth-password" value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? 'text' : 'password'} autoComplete={isRegistering ? 'new-password' : 'current-password'} maxLength={128} minLength={6} required={isRegistering || mode === 'password'} placeholder={isRegistering ? '至少 6 位，用于后续登录' : '请输入登录密码'} />{password && <button type="button" className="password-toggle" aria-label={showPassword ? '隐藏密码' : '显示密码'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>}</div></label>}
     {isRegistering && <small className="auth-hint auth-password-note">邮箱验证码用于确认身份，登录密码用于以后快速登录。</small>}
     <button className="submit" type="submit" disabled={busy}>{busy ? <RefreshCw size={17} className="spin" /> : isRegistering ? <UserRound size={17} /> : <LogIn size={17} />} {busy ? '处理中…' : isRegistering ? '创建账号' : '进入我的包裹'}</button>
@@ -448,9 +540,5 @@ function AuthForm({ view, setView, mode, setMode, email, setEmail, password, set
 }
 
 function LoginPage({ view, setView, mode, setMode, email, setEmail, password, setPassword, onSubmit, onNotice, onSendCode, busy, demoMode, backendUnavailable }: AuthFormProps) {
-  return <div className="auth-screen"><div className="auth-panel"><div className="auth-brand"><span className="brand-mark"><PackageCheck size={20} /></span><b>驿见</b></div><div className="auth-copy"><div className="eyebrow"><Sparkles size={14} /> 主流快递，一处查看</div><h1>你的包裹，<br /><span>不必到处找。</span></h1><p>登录后同步你授权的快递平台，到站时及时提醒，取件码只为你保留。</p></div><AuthForm key={`${view}-${mode}`} view={view} setView={setView} mode={mode} setMode={setMode} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onSubmit={onSubmit} onNotice={onNotice} onSendCode={onSendCode} busy={busy} demoMode={demoMode} backendUnavailable={backendUnavailable} /><div className="auth-safe"><ShieldCheck size={15} /> 我们只查询你本人授权的数据来源</div></div><div className="auth-art"><div className="mock-window"><div className="mock-bar"><i /><i /><i /></div><div className="mock-body"><div className="mock-card"><span /><span /><b><PackageCheck size={15} /> A6-219</b></div><div className="mock-row"><div /><div /></div></div></div><div className="mock-caption"><Eye size={16} /><div><b>隐私可见</b><small>取件码不会出现在系统通知里</small></div></div></div></div>
-}
-
-function LoginModal({ view, setView, mode, setMode, email, setEmail, password, setPassword, onSubmit, onNotice, onSendCode, busy, demoMode, backendUnavailable, onClose, onLogout }: AuthFormProps & { onClose: () => void; onLogout: () => void }) {
-  return <div className="modal-layer" onClick={onClose}><div className="login-modal" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" aria-label="关闭账号管理" onClick={onClose}><X size={18} /></button><div className="modal-icon"><UserRound size={20} /></div><small>账号管理</small><h2 id="account-dialog-title">{view === 'register' ? '注册账号' : '登录驿站'}</h2><p>{view === 'register' ? '邮箱验证后即可创建驿见账号' : `当前账号：${maskEmail(email)}`}</p><AuthForm key={`${view}-${mode}`} view={view} setView={setView} mode={mode} setMode={setMode} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onSubmit={onSubmit} onNotice={onNotice} onSendCode={onSendCode} busy={busy} demoMode={demoMode} backendUnavailable={backendUnavailable} />{view === 'login' && <button className="modal-logout" type="button" onClick={onLogout}><LogOut size={15} /> 退出当前账号</button>}</div></div>
+  return <div className="auth-screen"><div className="auth-panel"><div className="auth-brand"><span className="brand-mark"><PackageCheck size={20} /></span><b>驿见</b></div><div className="auth-copy"><div className="eyebrow"><Sparkles size={14} /> 主流快递，一处查看</div><h1>你的包裹，<br /><span>不必到处找。</span></h1><p>登录后输入运单号查询物流，记录和取件码只在你的账号内展示。</p></div><AuthForm key={view} view={view} setView={setView} mode={mode} setMode={setMode} email={email} setEmail={setEmail} password={password} setPassword={setPassword} onSubmit={onSubmit} onNotice={onNotice} onSendCode={onSendCode} busy={busy} demoMode={demoMode} backendUnavailable={backendUnavailable} /><div className="auth-safe"><ShieldCheck size={15} /> 你的包裹记录只与当前账号关联</div></div><div className="auth-art"><div className="mock-window"><div className="mock-bar"><i /><i /><i /></div><div className="mock-body"><div className="mock-card"><span /><span /><b><PackageCheck size={15} /> A6-219</b></div><div className="mock-row"><div /><div /></div></div></div><div className="mock-caption"><Eye size={16} /><div><b>隐私可见</b><small>取件码不会出现在系统通知里</small></div></div></div></div>
 }

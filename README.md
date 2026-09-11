@@ -1,6 +1,6 @@
 # 驿见 · 快递聚合查询 MVP
 
-一个面向网页和 Android 的快递聚合查询应用：邮箱登录、邮箱验证码、密码登录、运单号查件、地图轨迹展示、包裹状态、到站取件码和“我已取件”后的取件码清理规则均已做成可交互流程。
+一个面向网页和 Android 的快递聚合查询应用：邮箱登录、邮箱验证码、密码登录、手动输入运单号查件、地图轨迹展示、包裹状态、到站取件码和服务端保存的“我已取件”流程均已做成可交互流程。当前产品定位是“输入运单号后查询并保存”，不要求用户单独绑定快递账号。
 
 ## 当前完成
 
@@ -12,7 +12,7 @@
 - 持久化：部署环境使用 Supabase 关系表；本地 `netlify dev` 使用 `.netlify-local-data`，不会提交到版本库。
 - 承运商识别：顺丰、京东、中通、圆通、韵达、申通、极兔、德邦、EMS 等；服务端通过快递100自动识别运单号对应的平台。
 - 包裹状态：待取件、运输中、已完成；支持搜索、筛选、文字轨迹和地图轨迹面板。
-- 取件码：默认脱敏，支持显示、复制；点击“我已取件”后立即删除。
+- 取件码：默认脱敏，支持显示、复制；点击“我已取件”后由服务端保存已取件状态并删除取件码。
 - Capacitor Android 工程：应用 ID 为 `com.yijian.parcels`。
 
 ## 本地运行网页演示
@@ -100,9 +100,10 @@ KUAIDI100_RECOGNIZE_URL=https://www.kuaidi100.com/autonumber/autoComNum
 KUAIDI100_RESULTV2=5
 ```
 
-- `POST /api/parcels/query-tracking`：登录后提交一个运单号，查询并同步物流轨迹。
-- `GET /api/parcels`：获取当前登录用户已同步的包裹和轨迹。
-- 取件码不是由普通物流轨迹推测的，只有上游授权数据明确返回时才会保存和展示。
+- `POST /api/parcels/query-tracking`：登录后提交一个运单号，查询并保存物流轨迹。
+- `GET /api/parcels`：获取当前登录用户已查询并保存的包裹和轨迹。
+- `POST /api/parcels/confirm-pickup`：登录后确认取件并由服务端删除对应取件码；请求体 `{ parcelId }`。
+- 取件码不是由普通物流轨迹推测的，只有上游数据明确返回时才会保存和展示。
 - 地图坐标字段为可选值：`latitude` / `longitude` 只在承运商接口明确返回时写入 `yijian_parcel_events`。
 
 包裹表定义位于 `supabase/migrations/20260910111618_yijian_parcel_storage.sql`，地图坐标扩展位于 `supabase/migrations/20260911120000_yijian_parcel_event_coordinates.sql`。部署前请在 Supabase SQL Editor 依次执行两份迁移，或使用已链接的 Supabase CLI 推送迁移。
@@ -134,9 +135,9 @@ APK 输出：
 
 本地代码已经接入快递100单号识别、实时查询、Supabase持久化和坐标字段兼容；上线前仍需完成：
 
-1. 在目标 Supabase 项目执行两份包裹迁移，并查询确认 `yijian_parcels`、`yijian_parcel_events` 可访问；
+1. 在目标 Supabase 项目执行包裹迁移，并查询确认 `yijian_parcels`、`yijian_parcel_events` 可访问；
 2. 配置生产环境快递100、Resend、Supabase 密钥，并完成一次真实运单查询；
 3. 若要显示真实地图底图，需要接入承运商明确返回经纬度的地图轨迹接口或经过授权的地理编码服务；当前无坐标时只显示文字轨迹；
 4. 后台定时同步、推送通知、数据删除任务、日志审计和隐私政策。
 
-无法从授权接口获得取件码的平台，只显示物流状态，不生成或猜测取件码。
+无法从上游接口获得取件码的平台，只显示物流状态，不生成或猜测取件码。

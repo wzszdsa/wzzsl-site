@@ -137,6 +137,31 @@ export async function listParcels(userId: string): Promise<StoredParcel[]> {
   return (rows as ParcelRow[]).map((row) => parcelFromRow(row, byParcel.get(row.id) ?? []))
 }
 
+export async function confirmParcelPickup(userId: string, parcelId: string): Promise<boolean> {
+  const client = supabase()
+  const now = new Date().toISOString()
+  const { data: parcel, error } = await client.from('yijian_parcels').update({
+    status: '已完成',
+    status_detail: '用户已确认取件',
+    location: '已从驿站取出',
+    pickup_code: null,
+    pickup_location: null,
+    eta: '已取件',
+    updated_at: now,
+  }).eq('id', parcelId).eq('user_id', userId).select('id').maybeSingle()
+  if (error) throw error
+  if (!parcel) return false
+  const { error: eventError } = await client.from('yijian_parcel_events').insert({
+    parcel_id: parcel.id,
+    event_at: now,
+    title: '用户已确认取件',
+    description: '取件码已按隐私策略删除。',
+    location: '已从驿站取出',
+  })
+  if (eventError) throw eventError
+  return true
+}
+
 export async function saveParcel(userId: string, candidate: Kuaidi100TrackingCandidate, detail: Kuaidi100TrackingDetail, pickup: Kuaidi100Pickup = {}): Promise<void> {
   const client = supabase()
   const now = new Date().toISOString()
