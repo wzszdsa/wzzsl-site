@@ -14,8 +14,8 @@ export default async function handler(request: Request): Promise<Response> {
     const password = typeof body.password === 'string' ? body.password : ''
     if (!email) return json({ message: '请输入正确的邮箱地址', code: 'INVALID_EMAIL' }, 400)
     if (!/^\d{6}$/.test(code)) return json({ message: '请输入 6 位验证码', code: 'INVALID_OTP' }, 400)
-    if (password && (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH)) {
-      return json({ message: `密码长度需为 ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} 位`, code: 'INVALID_PASSWORD' }, 400)
+    if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {
+      return json({ message: `请设置 ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} 位登录密码`, code: 'INVALID_PASSWORD' }, 400)
     }
     if (await readUserByEmail(email)) return json({ message: '该邮箱已经注册，请直接登录', code: 'EMAIL_ALREADY_REGISTERED' }, 409)
     if (!await verifyOtp(email, 'register', code)) return json({ message: '验证码错误或已过期，请重新获取验证码', code: 'INVALID_OTP' }, 401)
@@ -28,6 +28,7 @@ export default async function handler(request: Request): Promise<Response> {
       emailVerifiedAt: now,
       createdAt: now,
       updatedAt: now,
+      passwordSetAt: now,
     }
 
     try {

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS yijian_users (
   email_verified_at DATETIME(3) NULL,
   created_at DATETIME(3) NOT NULL,
   updated_at DATETIME(3) NOT NULL,
+  password_set_at DATETIME(3) NULL,
   PRIMARY KEY (id),
   UNIQUE KEY yijian_users_email_uq (email),
   KEY yijian_users_created_idx (created_at)

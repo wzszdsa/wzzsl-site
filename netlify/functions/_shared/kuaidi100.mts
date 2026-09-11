@@ -13,6 +13,8 @@ export type Kuaidi100Trace = {
   title: string
   description: string
   location?: string
+  latitude?: number
+  longitude?: number
 }
 
 export type Kuaidi100TrackingDetail = {
@@ -22,6 +24,8 @@ export type Kuaidi100TrackingDetail = {
   statusDetail?: string
   location?: string
   eta?: string
+  latitude?: number
+  longitude?: number
   traces: Kuaidi100Trace[]
 }
 
@@ -46,6 +50,37 @@ function firstText(record: Record<string, unknown>, names: string[]): string | u
     if (value) return value
   }
   return undefined
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  const number = typeof value === 'number' ? value : typeof value === 'string' ? Number(value.trim()) : NaN
+  return Number.isFinite(number) ? number : undefined
+}
+
+function firstNumber(record: Record<string, unknown>, names: string[]): number | undefined {
+  for (const name of names) {
+    const value = finiteNumber(record[name])
+    if (value !== undefined) return value
+  }
+  return undefined
+}
+
+function coordinatePair(value: unknown): { latitude: number; longitude: number } | undefined {
+  if (typeof value !== 'string') return undefined
+  const parts = value.split(/[,，\s]+/).map((part) => finiteNumber(part)).filter((part): part is number => part !== undefined)
+  if (parts.length < 2) return undefined
+  const [first, second] = parts
+  if (Math.abs(first) <= 90 && Math.abs(second) <= 180) return { latitude: first, longitude: second }
+  if (Math.abs(second) <= 90 && Math.abs(first) <= 180) return { latitude: second, longitude: first }
+  return undefined
+}
+
+function coordinatesFrom(record: Record<string, unknown>, position: Record<string, unknown>): { latitude?: number; longitude?: number } {
+  const pair = coordinatePair(record.areaCenter) ?? coordinatePair(record.coordinate) ?? coordinatePair(record.coordinates) ?? coordinatePair(position.areaCenter)
+  if (pair) return pair
+  const latitude = firstNumber(record, ['latitude', 'lat']) ?? firstNumber(position, ['latitude', 'lat'])
+  const longitude = firstNumber(record, ['longitude', 'lng', 'lon']) ?? firstNumber(position, ['longitude', 'lng', 'lon'])
+  return { ...(latitude !== undefined ? { latitude } : {}), ...(longitude !== undefined ? { longitude } : {}) }
 }
 
 function messageFrom(payload: unknown): string | undefined {
@@ -107,11 +142,15 @@ function tracesFrom(payload: Record<string, unknown>): Kuaidi100Trace[] {
   return raw.map((item) => {
     const record = item && typeof item === 'object' ? item as Record<string, unknown> : {}
     const description = firstText(record, ['context', 'desc', 'description', 'status', 'remark']) ?? '物流状态已更新'
+    const position = record.position && typeof record.position === 'object' ? record.position as Record<string, unknown> : {}
+    const { latitude, longitude } = coordinatesFrom(record, position)
     return {
       occurredAt: firstText(record, ['ftime', 'time', 'acceptTime', 'datetime']),
       title: firstText(record, ['status', 'statusName', 'remark']) ?? description,
       description,
       location: firstText(record, ['location', 'areaName', 'city']),
+      ...(latitude !== undefined ? { latitude } : {}),
+      ...(longitude !== undefined ? { longitude } : {}),
     }
   }).filter((item) => item.description)
 }
@@ -136,7 +175,12 @@ export async function recognizeTrackingNo(trackingNo: string): Promise<Kuaidi100
 }
 
 export async function queryTracking(candidate: Kuaidi100TrackingCandidate): Promise<Kuaidi100TrackingDetail> {
-  const payload = await request('KUAIDI100_TRACK_QUERY_URL', { com: candidate.carrierCode ?? '', num: candidate.trackingNo })
+  const resultv2 = env('KUAIDI100_RESULTV2')?.trim()
+  const payload = await request('KUAIDI100_TRACK_QUERY_URL', {
+    com: candidate.carrierCode ?? '',
+    num: candidate.trackingNo,
+    ...(resultv2 ? { resultv2 } : {}),
+  })
   const record = payload as Record<string, unknown>
   const traces = tracesFrom(record)
   const latest = traces[0]
@@ -147,6 +191,8 @@ export async function queryTracking(candidate: Kuaidi100TrackingCandidate): Prom
     statusDetail: firstText(record, ['state', 'stateEx', 'status', 'message']),
     location: firstText(record, ['location', 'currentLocation']) ?? latest?.location,
     eta: firstText(record, ['estimatedTime', 'estimateTime', 'eta']),
+    ...(latest?.latitude !== undefined ? { latitude: latest.latitude } : {}),
+    ...(latest?.longitude !== undefined ? { longitude: latest.longitude } : {}),
     traces,
   }
 }

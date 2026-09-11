@@ -19,6 +19,7 @@ type UserRow = {
   email_verified_at: string | null
   created_at: string
   updated_at: string
+  password_set_at: string | null
 }
 
 type OtpRow = {
@@ -50,6 +51,7 @@ export type StoredUser = {
   emailVerifiedAt?: string
   createdAt: string
   updatedAt: string
+  passwordSetAt?: string
 }
 
 export type StoredOtp = {
@@ -167,6 +169,7 @@ function userFromRow(row: UserRow): StoredUser {
     ...(row.email_verified_at ? { emailVerifiedAt: row.email_verified_at } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    ...(row.password_set_at ? { passwordSetAt: row.password_set_at } : {}),
   }
 }
 
@@ -190,12 +193,12 @@ export async function readUserByEmail(email: string): Promise<StoredUser | null>
   if (provider() === 'local') return readLocal<StoredUser>(`user:email:${email}`)
   if (provider() === 'mysql') {
     const [rows] = await mysqlPool().query<MysqlUserRow[]>(
-      'SELECT id,email,password_hash,email_verified_at,created_at,updated_at FROM yijian_users WHERE email = ? LIMIT 1',
+      'SELECT id,email,password_hash,email_verified_at,created_at,updated_at,password_set_at FROM yijian_users WHERE email = ? LIMIT 1',
       [email],
     )
     return rows[0] ? userFromRow(rows[0]) : null
   }
-  const { data, error } = await supabase().from(USER_TABLE).select('id,email,password_hash,email_verified_at,created_at,updated_at').eq('email', email).maybeSingle()
+  const { data, error } = await supabase().from(USER_TABLE).select('id,email,password_hash,email_verified_at,created_at,updated_at,password_set_at').eq('email', email).maybeSingle()
   if (error) throw error
   return data ? userFromRow(data as UserRow) : null
 }
@@ -204,12 +207,12 @@ export async function readUserById(id: string): Promise<StoredUser | null> {
   if (provider() === 'local') return readLocal<StoredUser>(`user:id:${id}`)
   if (provider() === 'mysql') {
     const [rows] = await mysqlPool().query<MysqlUserRow[]>(
-      'SELECT id,email,password_hash,email_verified_at,created_at,updated_at FROM yijian_users WHERE id = ? LIMIT 1',
+      'SELECT id,email,password_hash,email_verified_at,created_at,updated_at,password_set_at FROM yijian_users WHERE id = ? LIMIT 1',
       [id],
     )
     return rows[0] ? userFromRow(rows[0]) : null
   }
-  const { data, error } = await supabase().from(USER_TABLE).select('id,email,password_hash,email_verified_at,created_at,updated_at').eq('id', id).maybeSingle()
+  const { data, error } = await supabase().from(USER_TABLE).select('id,email,password_hash,email_verified_at,created_at,updated_at,password_set_at').eq('id', id).maybeSingle()
   if (error) throw error
   return data ? userFromRow(data as UserRow) : null
 }
@@ -222,8 +225,8 @@ export async function saveUser(user: StoredUser): Promise<void> {
   }
   if (provider() === 'mysql') {
     await mysqlPool().execute<ResultSetHeader>(
-      'INSERT INTO yijian_users (id,email,password_hash,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?)',
-      [user.id, user.email, user.passwordHash ?? null, user.emailVerifiedAt ?? user.createdAt, user.createdAt, user.updatedAt],
+      'INSERT INTO yijian_users (id,email,password_hash,email_verified_at,created_at,updated_at,password_set_at) VALUES (?,?,?,?,?,?,?)',
+      [user.id, user.email, user.passwordHash ?? null, user.emailVerifiedAt ?? user.createdAt, user.createdAt, user.updatedAt, user.passwordSetAt ?? (user.passwordHash ? user.updatedAt : null)],
     )
     return
   }
@@ -234,8 +237,30 @@ export async function saveUser(user: StoredUser): Promise<void> {
     email_verified_at: user.emailVerifiedAt ?? user.createdAt,
     created_at: user.createdAt,
     updated_at: user.updatedAt,
+    password_set_at: user.passwordSetAt ?? (user.passwordHash ? user.updatedAt : null),
   })
   if (error) throw error
+}
+
+export async function setUserPassword(userId: string, passwordHash: string, passwordSetAt: string): Promise<boolean> {
+  if (provider() === 'local') {
+    const user = await readLocal<StoredUser>(`user:id:${userId}`)
+    if (!user || user.passwordHash) return false
+    const next = { ...user, passwordHash, passwordSetAt, updatedAt: passwordSetAt }
+    await writeLocal(`user:email:${user.email}`, next)
+    await writeLocal(`user:id:${user.id}`, next)
+    return true
+  }
+  if (provider() === 'mysql') {
+    const [result] = await mysqlPool().execute<ResultSetHeader>(
+      'UPDATE yijian_users SET password_hash = ?, password_set_at = ?, updated_at = ? WHERE id = ? AND password_hash IS NULL',
+      [passwordHash, passwordSetAt, passwordSetAt, userId],
+    )
+    return result.affectedRows > 0
+  }
+  const { data, error } = await supabase().from(USER_TABLE).update({ password_hash: passwordHash, password_set_at: passwordSetAt, updated_at: passwordSetAt }).eq('id', userId).is('password_hash', null).select('id')
+  if (error) throw error
+  return Boolean(data?.length)
 }
 
 export async function readOtp(email: string, purpose: string): Promise<StoredOtp | null> {

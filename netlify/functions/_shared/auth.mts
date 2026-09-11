@@ -1,4 +1,4 @@
-import { consumeOtp, deleteSession, incrementOtpAttempts, readOtp, readSession, readUserByEmail as readStoredUserByEmail, readUserById as readStoredUserById, saveUser as saveStoredUser, writeSession, type StoredOtp, type StoredSession, type StoredUser } from './storage.mts'
+import { consumeOtp, deleteSession, incrementOtpAttempts, readOtp, readSession, readUserByEmail as readStoredUserByEmail, readUserById as readStoredUserById, saveUser as saveStoredUser, setUserPassword as setStoredUserPassword, writeSession, type StoredOtp, type StoredSession, type StoredUser } from './storage.mts'
 import { bodyOf, clearSessionCookie, cookieValue, json, sessionCookie } from './http.mts'
 import { createToken, hashSecret, hashToken, OTP_MAX_ATTEMPTS, SESSION_TTL_SECONDS, verifySecret } from './security.mts'
 
@@ -27,8 +27,12 @@ export async function verifyPassword(password: string, passwordHash?: string): P
   return Boolean(passwordHash && await verifySecret(password, passwordHash))
 }
 
-export function publicUser(user: UserRecord): Record<string, string> {
-  return { id: user.id, email: user.email, createdAt: user.createdAt }
+export async function setUserPassword(userId: string, password: string): Promise<boolean> {
+  return setStoredUserPassword(userId, await createPasswordHash(password), new Date().toISOString())
+}
+
+export function publicUser(user: UserRecord): Record<string, unknown> {
+  return { id: user.id, email: user.email, createdAt: user.createdAt, passwordSet: Boolean(user.passwordHash) }
 }
 
 export async function createSession(userId: string, request: Request): Promise<{ token: string; cookie: string }> {

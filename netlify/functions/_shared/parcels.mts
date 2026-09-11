@@ -17,7 +17,7 @@ export type StoredParcel = {
   location: string
   code?: string
   spot?: string
-  events: Array<{ time: string; title: string; text: string; active?: boolean }>
+  events: Array<{ time: string; title: string; text: string; active?: boolean; location?: string; lat?: number; lng?: number }>
 }
 
 type ParcelRow = {
@@ -40,6 +40,8 @@ type EventRow = {
   title: string
   description: string
   location: string | null
+  latitude: number | null
+  longitude: number | null
 }
 
 const CARRIER_STYLE: Record<string, Pick<StoredParcel, 'carrier' | 'short' | 'color' | 'pale'>> = {
@@ -50,6 +52,13 @@ const CARRIER_STYLE: Record<string, Pick<StoredParcel, 'carrier' | 'short' | 'co
   yunda: { carrier: '韵达快递', short: '韵达', color: '#7659d6', pale: '#f1edff' },
   sto: { carrier: '申通快递', short: '申通', color: '#ef7c35', pale: '#fff0e7' },
   ems: { carrier: 'EMS', short: 'EMS', color: '#2b7bb9', pale: '#eaf5fd' },
+  jtexpress: { carrier: '极兔速递', short: '极兔', color: '#e95c72', pale: '#fff0f3' },
+  deppon: { carrier: '德邦快递', short: '德邦', color: '#3193bf', pale: '#eaf7fc' },
+  best: { carrier: '百世快递', short: '百世', color: '#e5a52f', pale: '#fff8e5' },
+  youshunda: { carrier: '优速快递', short: '优速', color: '#6b61ca', pale: '#f1efff' },
+  anep: { carrier: '安能物流', short: '安能', color: '#e06e3a', pale: '#fff0e8' },
+  china_post: { carrier: '中国邮政', short: '邮政', color: '#cf4e4e', pale: '#fff0f0' },
+  zjs: { carrier: '宅急送', short: '宅急送', color: '#d96e3e', pale: '#fff1eb' },
 }
 
 function supabase(): SupabaseClient {
@@ -91,6 +100,9 @@ function parcelFromRow(row: ParcelRow, events: EventRow[]): StoredParcel {
     title: event.title,
     text: event.location ? `${event.description} · ${event.location}` : event.description,
     active: index === 0,
+    ...(event.location ? { location: event.location } : {}),
+    ...(event.latitude !== null ? { lat: event.latitude } : {}),
+    ...(event.longitude !== null ? { lng: event.longitude } : {}),
   }))
   return {
     id: row.id,
@@ -114,7 +126,7 @@ export async function listParcels(userId: string): Promise<StoredParcel[]> {
   if (error) throw error
   if (!rows?.length) return []
   const parcelIds = rows.map((row) => row.id as string)
-  const { data: events, error: eventError } = await client.from('yijian_parcel_events').select('parcel_id,event_at,title,description,location').in('parcel_id', parcelIds).order('event_at', { ascending: false })
+  const { data: events, error: eventError } = await client.from('yijian_parcel_events').select('parcel_id,event_at,title,description,location,latitude,longitude').in('parcel_id', parcelIds).order('event_at', { ascending: false })
   if (eventError) throw eventError
   const byParcel = new Map<string, EventRow[]>()
   for (const event of (events ?? []) as EventRow[]) {
@@ -150,6 +162,8 @@ export async function saveParcel(userId: string, candidate: Kuaidi100TrackingCan
     title: trace.title,
     description: trace.description,
     location: trace.location ?? null,
+    latitude: trace.latitude ?? null,
+    longitude: trace.longitude ?? null,
   }))
   if (eventRows.length) {
     const { error: eventError } = await client.from('yijian_parcel_events').upsert(eventRows, { onConflict: 'parcel_id,event_at,title,description' })

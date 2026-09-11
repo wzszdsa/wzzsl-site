@@ -22,8 +22,9 @@ export default async function handler(request: Request): Promise<Response> {
     const user = await readUserByEmail(email)
     if (!user) return json({ message: '该邮箱尚未注册，请先注册账号', code: 'EMAIL_NOT_REGISTERED' }, 404)
 
+    if (modeValue === 'password' && !user.passwordHash) return json({ message: '该账号尚未设置登录密码，请改用邮箱验证码登录', code: 'PASSWORD_NOT_SET' }, 409)
     const valid = modeValue === 'password' ? await verifyPassword(password, user.passwordHash) : await verifyOtp(email, 'login', code)
-    if (!valid) return json({ message: modeValue === 'password' ? '邮箱或密码错误' : '验证码错误或已过期，请重新获取验证码', code: 'AUTH_FAILED' }, 401)
+    if (!valid) return json({ message: modeValue === 'password' ? '邮箱或密码错误，请检查后重试' : '验证码错误或已过期，请重新获取验证码', code: 'AUTH_FAILED' }, 401)
 
     const session = await createSession(user.id, request)
     return authResponse({ user: publicUser(user) }, session.cookie)
