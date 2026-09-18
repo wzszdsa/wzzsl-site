@@ -1,0 +1,418 @@
+.app-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 0 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.topbar h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 44px;
+  line-height: 1.1;
+  font-weight: 750;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.notify-button,
+.primary-button,
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-weight: 700;
+}
+
+.notify-button {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  color: #134e4a;
+  background: #ccfbf1;
+  border-color: #99f6e4;
+}
+
+.primary-button {
+  width: 100%;
+  color: #ffffff;
+  background: #111827;
+}
+
+.text-button {
+  min-height: 34px;
+  padding: 0 10px;
+  color: #374151;
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
+.alerts {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.alert {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  color: #7c2d12;
+  background: #ffedd5;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+}
+
+.alert div {
+  display: grid;
+  gap: 2px;
+}
+
+.alert span {
+  font-size: 13px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.summary-grid div {
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.summary-grid span {
+  display: block;
+  color: #111827;
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.summary-grid p {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.todo-form,
+.todo-panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.todo-form {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.form-title,
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #111827;
+  background: #ffffff;
+  outline: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 12px;
+}
+
+.form-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.todo-panel {
+  min-height: 560px;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.filter-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+  background: #f3f4f6;
+  border-radius: 8px;
+}
+
+.filter-tabs button {
+  min-height: 32px;
+  padding: 0 10px;
+  color: #4b5563;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.filter-tabs button.active {
+  color: #111827;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.08);
+}
+
+.todo-list {
+  display: grid;
+  gap: 0;
+}
+
+.todo-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.todo-item:last-child {
+  border-bottom: 0;
+}
+
+.todo-item.completed h3,
+.todo-item.completed .todo-content > p {
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+.todo-item.overdue {
+  background: #fff7ed;
+}
+
+.todo-item.due {
+  background: #ecfeff;
+}
+
+.complete-button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  color: #374151;
+  background: #ffffff;
+}
+
+.complete-button {
+  color: #0f766e;
+}
+
+.icon-button.danger {
+  color: #b91c1c;
+}
+
+.todo-content {
+  min-width: 0;
+  text-align: left;
+}
+
+.todo-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.todo-line h3 {
+  min-width: 0;
+  margin: 0;
+  color: #111827;
+  font-size: 17px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.todo-content > p {
+  margin: 6px 0 0;
+  color: #4b5563;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.todo-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.todo-meta span,
+.priority {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.todo-meta span {
+  color: #4b5563;
+  background: #f3f4f6;
+}
+
+.priority.low {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.priority.normal {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.priority.high {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.todo-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 360px;
+  color: #9ca3af;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    width: min(100% - 20px, 680px);
+    padding-top: 20px;
+  }
+
+  .topbar,
+  .panel-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .topbar h1 {
+    font-size: 34px;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row,
+  .todo-item {
+    grid-template-columns: 1fr;
+  }
+
+  .todo-actions {
+    justify-content: flex-end;
+  }
+}
