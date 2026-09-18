@@ -1,0 +1,73 @@
+# ============================================================
+#  .gitignore — wzzsl-site
+#  个人网站主仓库（monorepo）
+#  原则：源码与配置入库；构建产物、依赖、凭据一律不入库
+# ============================================================
+
+# ---------- 临时与备份目录（仅本地存在）----------
+.staging/
+.nested-git-backup/
+.workbuddy-ai/
+
+# ---------- Node 依赖 ----------
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+*.tsbuildinfo
+
+# ---------- 构建产物 ----------
+dist/
+build/
+.next/
+out/
+*.exe
+*.dll
+*.pyd
+
+# ---------- 日志与临时文件 ----------
+*.log
+logs/
+*.pid
+*.out
+tmp/
+temp/
+
+# ---------- 本地配置与凭据（绝不提交）----------
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.token
+*.key
+*.pem
+secrets.*
+credentials.*
+
+# ---------- Python 缓存 ----------
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---------- 虚拟环境 ----------
+venv/
+.venv/
+env/
+ENV/
+
+# ---------- IDE / 编辑器 ----------
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# ---------- 操作系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
