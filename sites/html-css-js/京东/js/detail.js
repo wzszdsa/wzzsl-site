@@ -11,7 +11,7 @@ prev.addEventListener("click", () => {
     left += 58;
     ul.style.left = `${left}px`;
   }
-  prev.style.background = "url(./images/disabled-prev.png)";
+  prev.style.background = "url(images/disabled-prev.png)";
 });
 next.addEventListener("click", () => {
   if (left <= -58 * (lis.length - 5)) {

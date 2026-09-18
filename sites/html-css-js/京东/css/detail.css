@@ -48,7 +48,7 @@
   top: 50%;
   margin-top: -16px;
   cursor: pointer;
-  background: url(/images/__sprite.png) no-repeat;
+  background: url(../images/__sprite.png) no-repeat;
 }
 .prev {
   left: 0;

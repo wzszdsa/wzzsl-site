@@ -21,7 +21,7 @@ body {
   height: 450px;
   width: 250px;
   border-radius: 20px;
-  background: url("/1.jpg") no-repeat;
+  background: url("1.jpg") no-repeat;
   background-size: cover;
   box-shadow: 0 70px 60px -60px #000;
 }
@@ -59,6 +59,6 @@ body {
   opacity: 0.5;
 }
 .card:hover {
-  background: url("/1.jpg") top center no-repeat;
+  background: url("1.jpg") top center no-repeat;
   background-size: 500px;
 }
