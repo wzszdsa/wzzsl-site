@@ -5,12 +5,12 @@
 
 ## 需要配置的记录
 
-假设 ECS 公网 IP 为 `<ECS_IP>`（部署时替换为实际值）。
+目标 ECS 公网 IP：`47.76.244.209`（实例 `i-j6c06mdtwtzobo4vaxc`，境外地域）。
 
 | 主机记录 | 类型 | 记录值 | TTL | 用途 |
 |---|---|---|---|---|
-| `@` | A | `<ECS_IP>` | 600 | 门户 `wzzsl.fun` |
-| `*` | A | `<ECS_IP>` | 600 | 全部子域（通配） |
+| `@` | A | `47.76.244.209` | 600 | 门户 `wzzsl.fun` |
+| `*` | A | `47.76.244.209` | 600 | 全部子域（通配） |
 | `_acme-challenge` | TXT | 由 certbot 自动维护 | 600 | 泛域名证书校验 |
 
 **为什么用通配记录**：本站有 7 个子域，且未来还会增加。一条 `*` 记录即可覆盖
@@ -29,8 +29,9 @@ certbot 需要临时创建 `_acme-challenge.wzzsl.fun` 的 TXT 记录。
 **方案 A：阿里云 DNS 插件（推荐，全自动续期）**
 
 ```bash
-# 安装插件
-sudo apt install python3-certbot-dns-aliyun
+# 安装插件（Alibaba Cloud Linux：certbot 来自 dnf，阿里云 DNS 插件来自 pip）
+sudo dnf install -y certbot python3-pip
+sudo pip3 install certbot-dns-aliyun
 
 # 配置阿里云 AccessKey（仅需 AliyunDNSFullAccess 权限）
 sudo tee /etc/letsencrypt/aliyun.ini >/dev/null <<'EOF'
