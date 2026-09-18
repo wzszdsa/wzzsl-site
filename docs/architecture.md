@@ -41,7 +41,7 @@
 | `box.wzzsl.fun` | 静态 | 直接读文件 | `/srv/wzzsl/box/` |
 | `demo.wzzsl.fun` | 静态（多目录） | 读文件 + 开启目录索引 | `/srv/wzzsl/demo/` |
 | `days.wzzsl.fun` | SPA + PWA | 读文件 + 回退；`sw.js` 不缓存 | `/srv/wzzsl/days/` |
-| `yijian.wzzsl.fun` | SPA + Node API | `/api/` 反代；其余读文件 | `/srv/wzzsl/yijian/` + `127.0.0.1:3101` |
+| `yijian.wzzsl.fun` | SPA + Node API | `/api/` 反代；其余读文件 | `/srv/wzzsl/yijian/` + `127.0.0.1:3000` |
 | `petcare.wzzsl.fun` | Next.js | 全量反代 | `127.0.0.1:3102` |
 
 **为什么 SPA 需要回退**：`todo`、`days`、`yijian` 都是客户端路由的单页应用，
@@ -78,6 +78,15 @@ type StorageProvider = 'mysql' | 'supabase' | 'local'
 `MYSQL_URL` 即可走 MySQL 路径，源码无需改动。
 
 建表脚本位于 `sites/yijian-express/mysql/schema.sql`，需先在目标库中选中数据库再执行。
+
+**服务器上的实际形态**：驿见**已在运行**（早于本次整合），数据库为 **MariaDB 10.6.25**，
+监听 **53306**（非默认 3306），库名 `yijian`。服务单元 `yijian.service` 运行
+`/opt/yijian/server-dist/index.mjs`，监听 3000 端口，由 root crontab 中的
+`yijian-backup.sh` 每日备份到 `/var/backups/yijian`。
+
+本次整合**不改动该服务**，仅调整 Nginx 路由 —— 把它从根域迁到 `yijian.wzzsl.fun`。
+本仓库的 `deploy/yijian-adapter` 是同一批函数的另一套实现（脱离 Netlify 的兼容运行时），
+当前**未启用**，保留作为备选。
 
 ### PostgreSQL —— 宠物预约
 
