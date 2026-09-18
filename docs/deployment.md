@@ -206,7 +206,81 @@ git checkout main -- sites/todo_list
 
 ---
 
-## 四、故障排查
+## 四、查看数据库
+
+两个数据库都在 ECS 本机，**仅监听回环地址**，不对公网开放。
+
+| 库 | 用途 | 端口 | 账号 | 连接串位置 |
+|---|---|---|---|---|
+| PostgreSQL | 宠物预约 | `5432` | `petcare` / 库 `petcare` | `/srv/wzzsl/petcare/.env` |
+| MariaDB | 驿见快递 | **`53306`** | 见 `/etc/yijian/yijian.env` | 同左 |
+
+### 方式一：用仓库里的查询助手（推荐）
+
+`deploy/scripts/db-petcare.sh` 封装了 SSH + psql，凭据自动从
+`deploy/.env.deploy` 与 `deploy/.env.secrets` 读取：
+
+```bash
+bash deploy/scripts/db-petcare.sh                      # 交互式 psql
+bash deploy/scripts/db-petcare.sh --tables             # 列出所有表
+bash deploy/scripts/db-petcare.sh --count              # 按状态统计预约数
+bash deploy/scripts/db-petcare.sh --recent             # 最近 20 条预约
+bash deploy/scripts/db-petcare.sh "SELECT * FROM appointments;"
+```
+
+### 方式二：SSH 隧道 + 图形化工具
+
+适合用 DBeaver / Navicat / pgAdmin / TablePlus 浏览：
+
+```bash
+bash deploy/scripts/db-petcare.sh --tunnel
+```
+
+该命令会保持前台运行（Ctrl+C 断开），然后在图形化工具中填：
+
+| 项 | 值 |
+|---|---|
+| 主机 | `127.0.0.1` |
+| 端口 | `15432` |
+| 数据库 | `petcare` |
+| 用户名 | `petcare` |
+| 密码 | `deploy/.env.secrets` 中的 `PETCARE_DB_PASSWORD` |
+
+隧道的作用是把远端的 5432 映射到本地 15432，因此**不需要**在服务器上开放
+PostgreSQL 端口，也不会把它暴露到公网。
+
+### 方式三：直接登录服务器
+
+```bash
+ssh -i ~/.ssh/yijian_hk root@47.76.244.209
+cd /tmp    # 避免 postgres 用户读 /root 时的权限告警
+PGPASSWORD='<密码>' psql -h 127.0.0.1 -U petcare -d petcare
+```
+
+### 数据表结构
+
+宠物预约只有一张表 `public.appointments`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | uuid | 主键，`gen_random_uuid()` |
+| `customer_name` | text | 客户姓名，1–100 字符 |
+| `phone` | text | 电话，6–32 字符 |
+| `pet_name` | text | 宠物名，1–80 字符 |
+| `pet_type` | text | 宠物类型 |
+| `service` | text | 服务项目 |
+| `appointment_time` | timestamptz | 预约时间 |
+| `note` | text | 备注，≤1000 字符 |
+| `status` | text | `pending` / `confirmed` / `cancelled` / `completed` |
+| `created_at` | timestamptz | 创建时间 |
+
+> 该表启用了行级安全（RLS），但**未定义任何策略**。由于 `petcare` 是表的所有者，
+> RLS 对所有者的查询默认不生效，因此应用读写正常。若日后改用非所有者账号连接，
+> 需要额外添加 RLS 策略，否则会查不到任何数据。
+
+---
+
+## 五、故障排查
 
 Alibaba Cloud Linux 的 SELinux 与 firewalld 会引入一批「配置看着没错却不通」的现象，
 下表按可能性排序：

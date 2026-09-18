@@ -46,6 +46,9 @@ bash deploy/scripts/build-all.sh
 
 # 上传到服务器（需先配置环境变量，见 docs/deployment.md）
 bash deploy/scripts/upload.sh
+
+# 查看宠物预约数据库（PostgreSQL）
+bash deploy/scripts/db-petcare.sh --count
 ```
 
 ## 文档
