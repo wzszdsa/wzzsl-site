@@ -66,7 +66,7 @@ SSH_OPTS=(-p "$SERVER_PORT" -o StrictHostKeyChecking=accept-new)
 [[ -n "$SSH_KEY" ]] && SSH_OPTS+=(-i "$SSH_KEY")
 RSYNC_RSH="ssh ${SSH_OPTS[*]}"
 
-RSYNC_FLAGS=(-az --delete --human-readable)
+RSYNC_FLAGS=(-az --delete --human-readable --exclude=.env)
 [[ $DRY_RUN -eq 1 ]] && RSYNC_FLAGS+=(--dry-run --itemize-changes)
 
 # 安全护栏：确保待清空的远程目录确实是 REMOTE_ROOT 下的站点子目录，
@@ -101,11 +101,13 @@ push_dir() {
       log "  [dry-run] 将上传 $count 个文件，共 $size"
       return 0
     fi
-    # 先确保目标存在，再清空其内容（-mindepth 1 保留目录自身），最后解包
+    # 先确保目标存在，再清空其内容（-mindepth 1 保留目录自身），最后解包。
+    # ! -name '.env' 是关键：.env 只存在于服务器、不在产物里，
+    # 若一并清掉，systemd 会报 "Failed to load environment files" 而启动失败。
     tar -czf - -C "$src" . | ssh "${SSH_OPTS[@]}" "$SERVER_USER@$SERVER_HOST" \
       "set -e
        mkdir -p '$remote_path'
-       find '$remote_path' -mindepth 1 -delete
+       find '$remote_path' -mindepth 1 ! -name '.env' -delete
        tar -xzf - -C '$remote_path'"
   fi
 }

@@ -118,6 +118,11 @@ bash deploy/scripts/upload.sh    petcare
 
 然后在服务器上创建环境文件并启动：
 
+> **顺序很重要**：上传会把目标目录清空（等价于 `rsync --delete`），因此 `.env`
+> 必须在上传**之后**创建。上传脚本已加入 `.env` 保护（rsync 用 `--exclude=.env`，
+> tar 模式用 `! -name '.env'`），但首次部署仍建议按此顺序操作。
+> 若顺序颠倒，systemd 会报 `Failed to load environment files: No such file or directory`。
+
 ```bash
 tee /srv/wzzsl/petcare/.env >/dev/null <<'EOF'
 NODE_ENV=production
