@@ -1,0 +1,315 @@
+/* ============================================================
+   demo.wzzsl.fun — 前端练习合集索引页
+   ------------------------------------------------------------
+   与门户页（wzzsl.fun）同源的设计体系：暖色中性基底 + 单一
+   强调色，靠排版层级与间距建立秩序，而非堆砌色彩。
+
+   本页为纯静态、零外部依赖：不加载字体、图片或脚本文件。
+
+   卡片刻意做紧凑（约 190px 起）：17 个条目需要在一屏内
+   尽可能多地呈现，便于快速扫读。
+   ============================================================ */
+
+:root {
+  color-scheme: light dark;
+
+  --bg:            #faf7f2;
+  --surface:       rgba(255, 255, 255, 0.74);
+  --surface-hover: rgba(255, 255, 255, 0.96);
+  --text:          #1c1a16;
+  --muted:         #6b6559;
+  --faint:         #9a9486;
+  --border:        rgba(28, 26, 22, 0.10);
+  --border-strong: rgba(28, 26, 22, 0.20);
+  --accent:        #0f6e56;
+  --accent-soft:   #e2f1eb;
+  --accent-glow:   rgba(15, 110, 86, 0.14);
+  --hairline:      rgba(28, 26, 22, 0.07);
+
+  --shadow-sm: 0 1px 2px rgba(28, 26, 22, 0.04);
+  --shadow-md: 0 2px 6px rgba(28, 26, 22, 0.05), 0 10px 22px rgba(28, 26, 22, 0.06);
+
+  --radius:    13px;
+  --radius-lg: 18px;
+  --ease:      cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:            #14130f;
+    --surface:       rgba(38, 35, 30, 0.64);
+    --surface-hover: rgba(48, 44, 38, 0.86);
+    --text:          #f2efe9;
+    --muted:         #a49d90;
+    --faint:         #7d776b;
+    --border:        rgba(242, 239, 233, 0.10);
+    --border-strong: rgba(242, 239, 233, 0.22);
+    --accent:        #63cfa8;
+    --accent-soft:   rgba(99, 207, 168, 0.14);
+    --accent-glow:   rgba(99, 207, 168, 0.16);
+    --hairline:      rgba(242, 239, 233, 0.07);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.30), 0 10px 22px rgba(0, 0, 0, 0.26);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+               "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 64px 28px 72px;
+}
+
+/* ============================================================
+   页头
+   ============================================================ */
+.top {
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 44px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 22px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+.back svg {
+  width: 14px; height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.22s var(--ease);
+}
+.back:hover { color: var(--accent); }
+.back:hover svg { transform: translateX(-2.5px); }
+
+h1 {
+  margin: 0 0 14px;
+  font-size: clamp(1.75rem, 4.4vw, 2.4rem);
+  font-weight: 640;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.lede {
+  margin: 0;
+  max-width: 58ch;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.lede strong {
+  font-weight: 620;
+  color: var(--text);
+}
+
+/* ============================================================
+   分组标题
+   ============================================================ */
+section { margin-bottom: 44px; }
+
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 620;
+  letter-spacing: -0.005em;
+}
+
+.sec-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   紧凑卡片网格
+   ============================================================ */
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 100%;
+  padding: 15px 16px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  transition: transform 0.22s var(--ease),
+              border-color 0.22s ease,
+              box-shadow 0.22s ease,
+              background-color 0.22s ease;
+}
+
+/* 悬停时从光标位置透出的柔光（坐标由 CSS 变量传入，无脚本时为中性位置） */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: radial-gradient(
+    200px circle at var(--mx, 50%) var(--my, 0%),
+    var(--accent-glow),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  pointer-events: none;
+}
+
+.card:hover {
+  transform: translateY(-2.5px);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-md);
+}
+.card:hover::before { opacity: 1; }
+
+.card:active { transform: translateY(-1px) scale(0.994); }
+
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.card-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+.card-desc {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--muted);
+  flex-grow: 1;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+.card-tags em {
+  font-style: normal;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+/* 入场淡入：只动 opacity。
+   若一并动 transform，animation 的 fill-mode 会锁死该属性，
+   卡片悬停上浮将完全失效。 */
+@media (prefers-reduced-motion: no-preference) {
+  .card { animation: card-fade 0.5s var(--ease) both; }
+  @keyframes card-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}
+
+/* ============================================================
+   页脚
+   ============================================================ */
+footer {
+  margin-top: 52px;
+  padding-top: 22px;
+  border-top: 1px solid var(--hairline);
+}
+footer p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--faint);
+}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width: 560px) {
+  main { padding: 44px 18px 52px; }
+
+  .top { padding-bottom: 26px; margin-bottom: 34px; }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+
+  .card { padding: 13px 14px 12px; }
+  .card-title { font-size: 0.875rem; }
+  .card-desc { font-size: 0.75rem; }
+
+  section { margin-bottom: 36px; }
+}
+
+/* ============================================================
+   降低动态效果偏好
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

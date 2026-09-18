@@ -106,10 +106,13 @@ build_box() {
 }
 
 build_demo() {
-  log "前端练习合集：源码即产物，排除 IDE 与 VCS 目录"
+  log "前端练习合集：源码即产物，排除 IDE / VCS / 源码目录"
   rm -rf "$OUT/demo"; mkdir -p "$OUT/demo"
+  # ts/ 是 TypeScript 源码练习（app.ts + 1.9MB node_modules），没有任何页面引用它，
+  # 也不是可浏览的网页，因此不纳入部署。img/ 则被 lsxm3 引用，必须保留。
   (cd "$SITES/html-css-js" && tar \
       --exclude='.git' --exclude='.idea' --exclude='.vscode' \
+      --exclude='./ts' \
       -cf - .) | (cd "$OUT/demo" && tar -xf -)
 }
 

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="前端练习合集">
+  <style>
+    .bg { fill: #0f6e56; }
+    .fg { fill: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #63cfa8; }
+      .fg { fill: #14130f; }
+    }
+  </style>
+  <rect class="bg" width="32" height="32" rx="8"/>
+  <g class="fg">
+    <rect x="7.5"  y="7.5"  width="7.6" height="7.6" rx="2"/>
+    <rect x="16.9" y="7.5"  width="7.6" height="7.6" rx="2"/>
+    <rect x="7.5"  y="16.9" width="7.6" height="7.6" rx="2"/>
+    <rect x="16.9" y="16.9" width="7.6" height="7.6" rx="2"/>
+  </g>
+</svg>
