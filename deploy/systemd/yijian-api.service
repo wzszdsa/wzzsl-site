@@ -1,0 +1,46 @@
+# ============================================================
+#  驿见快递查询 API —— systemd 服务单元
+#  部署位置：/etc/systemd/system/yijian-api.service
+#
+#  说明：承载 sites/yijian-express 的 9 个接口，由 deploy/yijian-adapter
+#       提供 Netlify Functions 兼容运行时。Nginx 将 yijian.wzzsl.fun
+#        的 /api/ 前缀反代到本服务。
+# ============================================================
+
+[Unit]
+Description=驿见快递查询 API（Netlify Functions 兼容运行时）
+Documentation=https://github.com/wzszdsa/wzzsl-site
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wzzsl
+Group=wzzsl
+WorkingDirectory=/srv/wzzsl/yijian-api
+
+# 环境变量：MYSQL_URL、SESSION_SECRET、KUAIDI100_KEY 等
+# 该文件权限应为 600，属主 wzzsl
+EnvironmentFile=/srv/wzzsl/yijian-api/.env
+
+Environment=NODE_ENV=production
+Environment=PORT=3101
+Environment=HOST=127.0.0.1
+
+ExecStart=/usr/bin/node /srv/wzzsl/yijian-api/server.mjs
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=yijian-api
+
+# ---------- 基础加固 ----------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/wzzsl/yijian-api
+
+[Install]
+WantedBy=multi-user.target

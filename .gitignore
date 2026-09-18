@@ -17,6 +17,7 @@ node_modules/
 *.tsbuildinfo
 
 # ---------- 构建产物 ----------
+.build/
 dist/
 build/
 .next/

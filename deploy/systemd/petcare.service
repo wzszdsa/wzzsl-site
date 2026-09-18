@@ -1,0 +1,46 @@
+# ============================================================
+#  宠物预约 —— systemd 服务单元
+#  部署位置：/etc/systemd/system/petcare.service
+#
+#  说明：sites/pet-care 是 Next.js 应用，需要常驻 Node 进程。
+#        Nginx 将 petcare.wzzsl.fun 全量反代到本服务。
+# ============================================================
+
+[Unit]
+Description=宠物预约 Next.js 应用
+Documentation=https://github.com/wzszdsa/wzzsl-site
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wzzsl
+Group=wzzsl
+WorkingDirectory=/srv/wzzsl/petcare
+
+# 环境变量：DATABASE_URL（PostgreSQL）、OPENAI_API_KEY 等
+# 该文件权限应为 600，属主 wzzsl
+EnvironmentFile=/srv/wzzsl/petcare/.env
+
+Environment=NODE_ENV=production
+Environment=PORT=3102
+Environment=HOSTNAME=127.0.0.1
+
+# 直接调用 Next.js 二进制，避免依赖 npx / 全局包
+ExecStart=/usr/bin/node /srv/wzzsl/petcare/node_modules/next/dist/bin/next start -p 3102 -H 127.0.0.1
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=petcare
+
+# ---------- 基础加固 ----------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/wzzsl/petcare
+
+[Install]
+WantedBy=multi-user.target
