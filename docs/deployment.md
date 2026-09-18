@@ -20,10 +20,28 @@
 | MariaDB | ✅ 10.6.25 已运行 | 端口 **53306**（非默认 3306），库 `yijian` |
 | `yijian.service` | ✅ 已运行 24h+ | `/opt/yijian/server-dist/index.mjs`，端口 **3000** |
 | PostgreSQL | ✅ 15.18 本次新装 | 已调优，库 `petcare` 与表 `appointments` 已建 |
-| `/srv/wzzsl/` | ✅ 本次新建 | 7 个站点目录，六个静态站产物已上传 |
+| `/srv/wzzsl/` | ✅ 已部署 | 7 个站点目录，全部产物已上线 |
 | SELinux | ✅ **Disabled** | 实测 `getenforce` 返回 Disabled，无需标注上下文 |
 | firewalld | ✅ **未运行** | 实测 inactive，访问控制仅由阿里云安全组承担 |
-| 静态站点产物 | ✅ 已上传 | portal 2 / todo 5 / box 6 / demo 222 / days 8 / yijian 5 个文件 |
+| 静态站点 | ✅ 已上线 | portal 2 / todo 5 / box 6 / demo 222 / days 8 / yijian 5 个文件 |
+| pet-care | ✅ 已上线 | `petcare.service` 运行 Next.js 16.3.1，端口 3102，约 251 MB |
+| 证书 | ✅ 已含子域 | SAN 覆盖全部 7 个域名，下次续期 2026-11-17 |
+| DNS | ✅ 已配置 | `@` 与 `*` 均指向 `47.76.244.209` |
+
+**部署已于 2026-09-18 完成并验证**（七个域名均返回 HTTP 200）：
+
+| 域名 | 内容 |
+|---|---|
+| `wzzsl.fun` | 门户页 |
+| `todo.wzzsl.fun` | 待办清单 |
+| `box.wzzsl.fun` | 推箱子 |
+| `demo.wzzsl.fun` | 前端练习合集（目录索引） |
+| `days.wzzsl.fun` | 纪念日 PWA |
+| `yijian.wzzsl.fun` | 驿见快递（前端 + `/api/` 反代 3000） |
+| `petcare.wzzsl.fun` | 宠物预约（Next.js） |
+
+**运行基线**：内存占用 704 MB / 可用 966 MB；服务 nginx、mariadb、postgresql、
+yijian、petcare 全部 active；磁盘占用 25%。
 
 **内存基线**（实测）：mariadbd 96 MB、node 130 MB、postgres 26 MB、nginx 7 MB，
 合计约 260 MB，剩余约 1.1 GB 可供 pet-care 使用。
@@ -34,9 +52,11 @@
 
 ---
 
-## 二、待完成步骤（按依赖顺序）
+## 二、部署步骤（已于 2026-09-18 完成）
 
-### 步骤 1：添加 DNS 记录 ← **当前阻塞项**
+以下步骤已全部执行完毕，保留在此作为流程记录与后续重建参考。
+
+### 步骤 1：添加 DNS 记录 ✅ 已完成
 
 在阿里云云解析添加通配记录：
 
@@ -44,7 +64,8 @@
 |---|---|---|---|
 | `*` | A | `47.76.244.209` | 600 |
 
-`@` 记录已存在。**后续所有步骤都依赖这一步** —— HTTP-01 证书校验要求子域能解析到本机。
+`@` 记录原本已存在。**这一步是后续所有步骤的前置** —— HTTP-01 证书校验要求
+子域能解析到本机，未配置前无法签发覆盖子域的证书。
 
 验证（从服务器侧，本机 DNS 被代理劫持不可用）：
 
