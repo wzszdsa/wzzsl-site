@@ -147,6 +147,11 @@ build_yijian_api() {
 }
 
 build_petcare() {
+  # 注意：重复构建时，Next.js 会先清空已有的 .next 目录。若在带「安全删除」
+  # 拦截机制的环境中运行（例如某些受管控的 IDE 终端），大量 unlinkSync 调用
+  # 可能被判定为批量删除而被拦截，导致 next build 报错中止。
+  # 现象：Error: [safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] ...
+  # 处理：手动删除 .next 后重试，或在普通终端中执行本脚本。
   install_and_build "$SITES/pet-care" npm run build
   log "宠物预约：组装部署产物（Next.js 需常驻进程）"
   local pc_out="$OUT/petcare"
