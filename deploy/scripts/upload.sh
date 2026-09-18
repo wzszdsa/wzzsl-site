@@ -50,8 +50,17 @@ else
 fi
 
 need() { command -v "$1" >/dev/null 2>&1 || die "缺少依赖：$1"; }
-need rsync
 need ssh
+need tar
+
+# rsync 在 Windows Git Bash 中默认不存在，此时降级为 tar over ssh。
+# 两者语义一致：目标目录先清空再写入，等价于 rsync 的 --delete。
+if command -v rsync >/dev/null 2>&1; then
+  USE_RSYNC=1
+else
+  USE_RSYNC=0
+  warn "未找到 rsync，改用 tar over ssh（功能等价）"
+fi
 
 SSH_OPTS=(-p "$SERVER_PORT" -o StrictHostKeyChecking=accept-new)
 [[ -n "$SSH_KEY" ]] && SSH_OPTS+=(-i "$SSH_KEY")
@@ -60,15 +69,45 @@ RSYNC_RSH="ssh ${SSH_OPTS[*]}"
 RSYNC_FLAGS=(-az --delete --human-readable)
 [[ $DRY_RUN -eq 1 ]] && RSYNC_FLAGS+=(--dry-run --itemize-changes)
 
+# 安全护栏：确保待清空的远程目录确实是 REMOTE_ROOT 下的站点子目录，
+# 避免变量为空或路径异常时误删服务器上的其他内容。
+assert_safe_dest() {
+  local name="$1" dest="$2"
+  [[ -n "$name" && "$name" != "/" && "$name" != "." && "$name" != ".." ]] \
+    || die "非法的站点名：'$name'"
+  [[ "$dest" == "$REMOTE_ROOT"/* ]] \
+    || die "拒绝操作：目标 '$dest' 不在 $REMOTE_ROOT 之下"
+}
+
 push_dir() {
   local name="$1"
   local src="$OUT/$name"
   [[ -d "$src" ]] || die "产物不存在：$src（请先执行 build-all.sh $name）"
 
-  local dest="$SERVER_USER@$SERVER_HOST:$REMOTE_ROOT/$name/"
-  log "同步 $name → $dest"
-  # shellcheck disable=SC2086
-  rsync "${RSYNC_FLAGS[@]}" -e "$RSYNC_RSH" "$src/" "$dest"
+  local remote_path="$REMOTE_ROOT/$name"
+  assert_safe_dest "$name" "$remote_path"
+
+  if [[ $USE_RSYNC -eq 1 ]]; then
+    local dest="$SERVER_USER@$SERVER_HOST:$remote_path/"
+    log "同步 $name → $dest"
+    # shellcheck disable=SC2086
+    rsync "${RSYNC_FLAGS[@]}" -e "$RSYNC_RSH" "$src/" "$dest"
+  else
+    log "同步 $name → $SERVER_USER@$SERVER_HOST:$remote_path（tar over ssh）"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      local size count
+      size=$(du -sh "$src" | cut -f1)
+      count=$(find "$src" -type f | wc -l)
+      log "  [dry-run] 将上传 $count 个文件，共 $size"
+      return 0
+    fi
+    # 先确保目标存在，再清空其内容（-mindepth 1 保留目录自身），最后解包
+    tar -czf - -C "$src" . | ssh "${SSH_OPTS[@]}" "$SERVER_USER@$SERVER_HOST" \
+      "set -e
+       mkdir -p '$remote_path'
+       find '$remote_path' -mindepth 1 -delete
+       tar -xzf - -C '$remote_path'"
+  fi
 }
 
 restart_service() {

@@ -20,9 +20,10 @@
 | MariaDB | ✅ 10.6.25 已运行 | 端口 **53306**（非默认 3306），库 `yijian` |
 | `yijian.service` | ✅ 已运行 24h+ | `/opt/yijian/server-dist/index.mjs`，端口 **3000** |
 | PostgreSQL | ✅ 15.18 本次新装 | 已调优，库 `petcare` 与表 `appointments` 已建 |
-| `/srv/wzzsl/` | ✅ 本次新建 | 7 个站点目录已就绪 |
-| SELinux | ⚠️ 待确认放行 | 见第四节 |
-| firewalld | ⚠️ 待确认放行 | 另需确认阿里云安全组 |
+| `/srv/wzzsl/` | ✅ 本次新建 | 7 个站点目录，六个静态站产物已上传 |
+| SELinux | ✅ **Disabled** | 实测 `getenforce` 返回 Disabled，无需标注上下文 |
+| firewalld | ✅ **未运行** | 实测 inactive，访问控制仅由阿里云安全组承担 |
+| 静态站点产物 | ✅ 已上传 | portal 2 / todo 5 / box 6 / demo 222 / days 8 / yijian 5 个文件 |
 
 **内存基线**（实测）：mariadbd 96 MB、node 130 MB、postgres 26 MB、nginx 7 MB，
 合计约 260 MB，剩余约 1.1 GB 可供 pet-care 使用。
@@ -82,27 +83,19 @@ nginx -t && systemctl reload nginx
 
 > 执行前先备份：`cp /etc/nginx/conf.d/yijian.conf /root/yijian.conf.bak`
 
-### 步骤 4：SELinux 与 firewalld 放行
+### 步骤 4：SELinux 与 firewalld —— 本机无需处理
 
-```bash
-# 允许 Nginx 反代（否则 yijian / petcare 一律 502）
-setsebool -P httpd_can_network_connect 1
+**实测该实例 SELinux 为 Disabled、firewalld 未运行**，因此以下操作都不需要执行：
 
-# 让 Nginx 能读静态站点文件（否则静态站一律 403）
-dnf install -y policycoreutils-python-utils
-semanage fcontext -a -t httpd_sys_content_t \
-  "/srv/wzzsl/(portal|todo|box|demo|days|yijian)(/.*)?"
-restorecon -Rv /srv/wzzsl/portal /srv/wzzsl/todo  /srv/wzzsl/box \
-                /srv/wzzsl/demo   /srv/wzzsl/days  /srv/wzzsl/yijian
+- ~~`setsebool -P httpd_can_network_connect 1`~~ —— SELinux 未启用，反代不会被拦
+- ~~`semanage fcontext` / `restorecon`~~ —— 无上下文标注需求
+- ~~`firewall-cmd --add-service=http/https`~~ —— firewalld 未运行
 
-# 防火墙
-firewall-cmd --permanent --add-service=http
-firewall-cmd --permanent --add-service=https
-firewall-cmd --reload
-```
+实际承担访问控制的只有**阿里云安全组**。80/443 已放行（现有站点正常工作即为佐证）。
 
-`yijian-api` 与 `petcare` 的目录**不做标注** —— 它们是 Node 服务的代码与依赖，
-不经 Nginx 读取，标注反而可能干扰原生模块加载。
+> **保留本节的原因**：若日后出于安全加固启用 SELinux 或 firewalld，上面这些命令是必需的 ——
+> 届时遗漏会导致 Nginx 反代 502、静态站 403，而现象具有误导性（配置看着没错却不通）。
+> 相关排查手段见第四节。
 
 ### 步骤 5：上传静态站点
 

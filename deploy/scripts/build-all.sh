@@ -59,13 +59,18 @@ NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 mkdir -p "$OUT"
 
 # 在子项目内安装依赖并构建；npm ci 需要 lock 文件，缺失时回退到 install
+# 设 SKIP_INSTALL=1 可在 node_modules 已存在时跳过安装，加快重复构建
 install_and_build() {
   local dir="$1"; shift
-  log "安装依赖：${dir#$REPO_ROOT/}"
-  if [[ -f "$dir/package-lock.json" ]]; then
-    (cd "$dir" && npm ci --no-audit --no-fund)
+  if [[ "${SKIP_INSTALL:-0}" == "1" && -d "$dir/node_modules" ]]; then
+    log "跳过依赖安装（SKIP_INSTALL=1 且 node_modules 已存在）"
   else
-    (cd "$dir" && npm install --no-audit --no-fund)
+    log "安装依赖：${dir#$REPO_ROOT/}"
+    if [[ -f "$dir/package-lock.json" ]]; then
+      (cd "$dir" && npm ci --no-audit --no-fund)
+    else
+      (cd "$dir" && npm install --no-audit --no-fund)
+    fi
   fi
   if [[ $# -gt 0 ]]; then
     log "执行构建：${dir#$REPO_ROOT/} → $*"
@@ -92,7 +97,11 @@ build_todo() {
 }
 
 build_box() {
-  install_and_build "$SITES/push-box" npm run build:web
+  # push-box 的 build:web 只是把静态文件复制到 dist/（仅用 node 内置模块），
+  # 不需要任何依赖。而它的 devDependencies 含 Electron 与 Capacitor，
+  # 安装会下载上百 MB 二进制 —— 对网页构建毫无用处，因此跳过安装。
+  log "推箱子：build:web 仅复制文件，跳过依赖安装"
+  (cd "$SITES/push-box" && node scripts/build-static.mjs)
   copy_tree "$SITES/push-box/dist" "$OUT/box"
 }
 
@@ -139,15 +148,24 @@ build_yijian_api() {
 
 build_petcare() {
   install_and_build "$SITES/pet-care" npm run build
-  log "宠物预约：保留 .next 与运行期依赖（Next.js 需常驻进程）"
+  log "宠物预约：组装部署产物（Next.js 需常驻进程）"
   local pc_out="$OUT/petcare"
   rm -rf "$pc_out"; mkdir -p "$pc_out"
-  cp -R "$SITES/pet-care/.next"      "$pc_out/.next"
-  cp -R "$SITES/pet-care/public"     "$pc_out/public" 2>/dev/null || true
-  cp    "$SITES/pet-care/package.json" "$pc_out/package.json"
-  cp    "$SITES/pet-care/next.config.ts" "$pc_out/next.config.ts" 2>/dev/null || true
-  (cd "$SITES/pet-care" && npm ci --omit=dev --no-audit --no-fund)
-  copy_tree "$SITES/pet-care/node_modules" "$pc_out/node_modules"
+
+  # 必须用 -L 解引用：Next.js 会在 .next/node_modules/ 下创建指向源项目
+  # node_modules 的**绝对路径**符号链接（形如 pg-<hash> -> /d/.../node_modules/pg）。
+  # Windows 的 cp -R 无法复现该链接，且绝对路径在服务器上无效，
+  # 因此解引用为实体文件，使 .next 自包含。
+  cp -RL "$SITES/pet-care/.next" "$pc_out/.next"
+  cp -RL "$SITES/pet-care/public" "$pc_out/public" 2>/dev/null || true
+  cp -f  "$SITES/pet-care/package.json"      "$pc_out/package.json"
+  cp -f  "$SITES/pet-care/package-lock.json" "$pc_out/package-lock.json" 2>/dev/null || true
+  cp -f  "$SITES/pet-care/next.config.ts"    "$pc_out/next.config.ts" 2>/dev/null || true
+
+  # 在产物目录内安装生产依赖 —— 不触碰源项目的开发环境
+  # （此前写法会在源项目里跑 npm ci --omit=dev，会清掉 vitest/eslint 等开发依赖）
+  log "安装生产依赖到产物目录"
+  (cd "$pc_out" && npm ci --omit=dev --no-audit --no-fund)
 }
 
 # ---------- 执行 ----------
