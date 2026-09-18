@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="wzzsl.fun">
+  <style>
+    .bg { fill: #0f6e56; }
+    .fg { stroke: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #63cfa8; }
+      .fg { stroke: #14130f; }
+    }
+  </style>
+  <rect class="bg" width="32" height="32" rx="8"/>
+  <path class="fg"
+        d="M7.5 11.5 12.25 21.5 16 14.25 19.75 21.5 24.5 11.5"
+        fill="none" stroke-width="3.1"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

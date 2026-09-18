@@ -1,121 +1,453 @@
+/* ============================================================
+   wzzsl.fun 门户页样式
+   ------------------------------------------------------------
+   设计取向：暖色中性基底 + 单一强调色（墨绿），靠排版层级、
+   非对称栅格与克制的动效建立质感，而不是靠堆砌色彩。
+
+   动效只用 GPU 属性（transform / opacity / filter），并完整
+   支持 prefers-reduced-motion。
+
+   本页零外部依赖：不加载任何字体、图片或脚本文件，
+   图标为内联 SVG。
+   ============================================================ */
+
 :root {
-  --bg: #fbfaf8;
-  --surface: #ffffff;
-  --text: #1f1d1a;
-  --muted: #6b6760;
-  --border: #e5e1da;
-  --accent: #0f6e56;
-  --accent-soft: #e1f5ee;
+  color-scheme: light dark;
+
+  /* —— 浅色（默认）—— */
+  --bg:            #faf7f2;
+  --bg-tint:       #f3ede4;
+  --surface:       rgba(255, 255, 255, 0.72);
+  --surface-hover: rgba(255, 255, 255, 0.92);
+  --text:          #1c1a16;
+  --muted:         #6b6559;
+  --faint:         #9a9486;
+  --border:        rgba(28, 26, 22, 0.09);
+  --border-strong: rgba(28, 26, 22, 0.18);
+  --accent:        #0f6e56;
+  --accent-soft:   #e2f1eb;
+  --accent-glow:   rgba(15, 110, 86, 0.16);
+  --hairline:      rgba(28, 26, 22, 0.07);
+
+  --blob-a: rgba(214, 178, 122, 0.30);
+  --blob-b: rgba(15, 110, 86, 0.16);
+  --blob-c: rgba(196, 138, 110, 0.22);
+
+  --shadow-sm: 0 1px 2px rgba(28, 26, 22, 0.04);
+  --shadow-md: 0 2px 6px rgba(28, 26, 22, 0.05), 0 12px 28px rgba(28, 26, 22, 0.06);
+  --shadow-lg: 0 4px 10px rgba(28, 26, 22, 0.06), 0 24px 56px rgba(28, 26, 22, 0.10);
+
+  --radius:    16px;
+  --radius-lg: 22px;
+  --ease:      cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #171614;
-    --surface: #201e1b;
-    --text: #f2f0ec;
-    --muted: #a5a099;
-    --border: #33302b;
-    --accent: #5dcaa5;
-    --accent-soft: #17332b;
+    --bg:            #14130f;
+    --bg-tint:       #1a1815;
+    --surface:       rgba(38, 35, 30, 0.62);
+    --surface-hover: rgba(46, 43, 37, 0.82);
+    --text:          #f2efe9;
+    --muted:         #a49d90;
+    --faint:         #7d776b;
+    --border:        rgba(242, 239, 233, 0.09);
+    --border-strong: rgba(242, 239, 233, 0.20);
+    --accent:        #63cfa8;
+    --accent-soft:   rgba(99, 207, 168, 0.13);
+    --accent-glow:   rgba(99, 207, 168, 0.16);
+    --hairline:      rgba(242, 239, 233, 0.07);
+
+    --blob-a: rgba(150, 110, 60, 0.22);
+    --blob-b: rgba(60, 150, 120, 0.14);
+    --blob-c: rgba(140, 80, 60, 0.16);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.30), 0 12px 28px rgba(0, 0, 0, 0.28);
+    --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.34), 0 24px 56px rgba(0, 0, 0, 0.40);
   }
 }
 
 * { box-sizing: border-box; }
 
+html { -webkit-text-size-adjust: 100%; }
+
 body {
   margin: 0;
-  padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
-               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+               "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   font-size: 16px;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
+/* ============================================================
+   背景光晕（纯装饰）
+   ============================================================ */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.blob {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(80px);
+  will-change: transform;
+}
+
+.blob-a {
+  width: 46vmax; height: 46vmax;
+  top: -18vmax; left: -12vmax;
+  background: var(--blob-a);
+  animation: drift-a 26s ease-in-out infinite alternate;
+}
+.blob-b {
+  width: 38vmax; height: 38vmax;
+  top: 24vmax; right: -14vmax;
+  background: var(--blob-b);
+  animation: drift-b 32s ease-in-out infinite alternate;
+}
+.blob-c {
+  width: 30vmax; height: 30vmax;
+  bottom: -12vmax; left: 22vmax;
+  background: var(--blob-c);
+  animation: drift-c 38s ease-in-out infinite alternate;
+}
+
+@keyframes drift-a { to { transform: translate3d(6vmax, 4vmax, 0) scale(1.10); } }
+@keyframes drift-b { to { transform: translate3d(-5vmax, -6vmax, 0) scale(1.06); } }
+@keyframes drift-c { to { transform: translate3d(4vmax, -5vmax, 0) scale(1.12); } }
+
+/* ============================================================
+   布局骨架
+   ============================================================ */
 main {
-  max-width: 880px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 72px 24px 96px;
+  padding: 88px 28px 80px;
 }
 
-.hero { margin-bottom: 64px; }
+/* ============================================================
+   首屏：非对称双栏
+   ============================================================ */
+.hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 44px;
+  padding-bottom: 52px;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 64px;
+}
+
+@media (min-width: 900px) {
+  .hero {
+    grid-template-columns: 1.55fr 1fr;
+    gap: 64px;
+    align-items: start;
+  }
+}
+
+.eyebrow {
+  margin: 0 0 18px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
 
 h1 {
-  font-size: 2.25rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0 0 8px;
-}
-
-.subtitle {
-  color: var(--accent);
-  font-size: 0.9375rem;
-  font-weight: 500;
-  margin: 0 0 20px;
+  margin: 0 0 22px;
+  font-size: clamp(2.5rem, 7vw, 4rem);
+  font-weight: 640;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
 }
 
 .intro {
-  color: var(--muted);
   margin: 0;
-  max-width: 46ch;
-}
-
-h2 {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  max-width: 44ch;
+  font-size: 1.0625rem;
+  line-height: 1.72;
   color: var(--muted);
-  margin: 0 0 20px;
 }
 
-section { margin-bottom: 56px; }
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 34px;
+}
 
-.grid {
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 19px;
+  border-radius: 11px;
+  font-size: 0.9375rem;
+  font-weight: 550;
+  text-decoration: none;
+  transition: transform 0.18s var(--ease),
+              background-color 0.18s ease,
+              border-color 0.18s ease,
+              box-shadow 0.18s ease;
+}
+.btn svg {
+  width: 15px; height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.btn:active { transform: scale(0.975); }
+
+.btn-solid {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10), 0 8px 20px var(--accent-glow);
+}
+.btn-solid:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 14px 30px var(--accent-glow);
+}
+
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.btn-ghost:hover {
+  transform: translateY(-1.5px);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+/* —— 右侧状态栏 —— */
+.hero-aside {
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.aside-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.pulse {
+  position: relative;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+.pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-ring 2.4s var(--ease) infinite;
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  70%  { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+.domains {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 2px;
+}
+.domains li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.domains li:last-child { border-bottom: none; padding-bottom: 0; }
+.domains code {
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.aside-note {
+  font-size: 0.75rem;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   区块标题
+   ============================================================ */
+section { margin-bottom: 60px; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.section-note {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--faint);
+}
+
+/* ============================================================
+   非对称 bento 网格
+   —— 刻意避免等宽三列卡片排布
+   ============================================================ */
+.bento {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
   gap: 16px;
 }
 
+.bento > li { grid-column: span 12; }
+
+@media (min-width: 780px) {
+  .bento > .span-7 { grid-column: span 7; }
+  .bento > .span-5 { grid-column: span 5; }
+}
+
+/* ============================================================
+   卡片
+   ============================================================ */
 .card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 16px;
   height: 100%;
-  padding: 20px;
-  background: var(--surface);
+  padding: 22px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  backdrop-filter: blur(14px) saturate(1.25);
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.24);
   text-decoration: none;
   color: inherit;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  overflow: hidden;
+  transition: transform 0.26s var(--ease),
+              border-color 0.26s ease,
+              box-shadow 0.26s ease,
+              background-color 0.26s ease;
+}
+
+/* 悬停时从光标位置透出的柔光（坐标由脚本写入 --mx / --my） */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: radial-gradient(
+    240px circle at var(--mx, 50%) var(--my, 0%),
+    var(--accent-glow),
+    transparent 68%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
 .card:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
+.card:hover::before { opacity: 1; }
+
+.card:active { transform: translateY(-1px) scale(0.995); }
 
 .card:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+
+/* —— 图标 —— */
+.card-icon {
+  display: grid;
+  place-items: center;
+  width: 42px; height: 42px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  transition: transform 0.26s var(--ease);
+}
+.card-icon svg {
+  width: 21px; height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.card:hover .card-icon { transform: scale(1.06) rotate(-3deg); }
+
+/* —— 文字 —— */
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
 }
 
 .card-title {
-  font-weight: 600;
   font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
 }
 
 .card-desc {
-  color: var(--muted);
   font-size: 0.875rem;
-  line-height: 1.55;
-  flex-grow: 1;
+  line-height: 1.6;
+  color: var(--muted);
 }
 
 .tags {
@@ -124,30 +456,138 @@ section { margin-bottom: 56px; }
   gap: 6px;
   margin-top: 4px;
 }
-
 .tags em {
   font-style: normal;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--accent);
   background: var(--accent-soft);
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
 }
 
-footer {
-  border-top: 1px solid var(--border);
-  padding-top: 24px;
-  font-size: 0.875rem;
+/* —— 右上角箭头：默认隐藏，悬停浮现 —— */
+.card-arrow {
+  display: grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  flex: none;
+  border-radius: 8px;
+  color: var(--faint);
+  opacity: 0;
+  transform: translate(-4px, 4px);
+  transition: opacity 0.24s ease, transform 0.24s var(--ease), color 0.24s ease;
+}
+.card-arrow svg {
+  width: 15px; height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.card:hover .card-arrow {
+  opacity: 1;
+  transform: none;
+  color: var(--accent);
 }
 
-footer a {
+/* ============================================================
+   页脚
+   ============================================================ */
+footer {
+  margin-top: 76px;
+  padding-top: 26px;
+  border-top: 1px solid var(--hairline);
+}
+
+.footer-main {
+  margin: 0 0 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.footer-note {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--faint);
+}
+.footer-note a {
   color: var(--muted);
   text-decoration: none;
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 1px;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.footer-note a:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
-footer a:hover { color: var(--accent); }
+/* ============================================================
+   入场动画
+   —— 仅在脚本可用时启用（.js 由内联脚本提前写入），
+      脚本不可用时内容默认可见，不会白屏。
 
-@media (max-width: 480px) {
-  main { padding: 48px 20px 64px; }
-  h1 { font-size: 1.875rem; }
+   用 animation 而非 transition 承载错峰延迟：transition 的
+   transition-delay 会一并作用于悬停位移，导致上浮被拖慢。
+   animation 结束后由脚本加上 .revealed 撤销动画，把 transform
+   的控制权交还给 transition，悬停效果才不受影响。
+   ============================================================ */
+.js .card { opacity: 0; }
+
+.js .card.is-visible {
+  animation: card-in 0.62s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.js .card.revealed {
+  animation: none;
+  opacity: 1;
+}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+@media (max-width: 640px) {
+  main { padding: 56px 20px 60px; }
+
+  .hero { gap: 34px; padding-bottom: 38px; margin-bottom: 46px; }
+
+  .intro { font-size: 1rem; }
+
+  .hero-actions { margin-top: 26px; }
+  .btn { flex: 1 1 auto; justify-content: center; }
+
+  .card { padding: 18px; gap: 14px; }
+  .card-arrow { display: none; }
+
+  .hero-aside { padding: 18px 20px; }
+  .aside-note { display: none; }
+
+  section { margin-bottom: 46px; }
+  footer { margin-top: 56px; }
+}
+
+/* ============================================================
+   降低动态效果偏好
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .blob { animation: none; }
+  .js .card { opacity: 1; transform: none; }
+  .pulse::after { display: none; }
 }

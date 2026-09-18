@@ -3,79 +3,260 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>wzzsl.fun</title>
-<meta name="description" content="个人项目主页 —— 收录我做的各类小应用与前端练习。">
+<title>wzzsl.fun — 个人项目主页</title>
+<meta name="description" content="wzzsl.fun 个人项目主页，收录六个独立部署的小应用与前端练习，每个项目在各自的子域名下运行。">
+<meta name="theme-color" content="#faf7f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14130f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- 在样式表之前标记脚本可用：入场动画只在此时启用，
+     否则脚本被禁用时卡片会一直隐藏 -->
+<script>document.documentElement.classList.add('js');</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+<!-- 背景光晕：纯装饰，不影响布局与可访问性 -->
+<div class="aurora" aria-hidden="true">
+  <span class="blob blob-a"></span>
+  <span class="blob blob-b"></span>
+  <span class="blob blob-c"></span>
+</div>
+
 <main>
 
+  <!-- ============ 首屏：非对称双栏（左主右辅）============ -->
   <header class="hero">
-    <h1>wzzsl.fun</h1>
-    <p class="subtitle">个人项目主页</p>
-    <p class="intro">这里收录我做的各类小应用与前端练习，每个项目独立部署在各自的子域名下。</p>
+    <div class="hero-main">
+      <p class="eyebrow">个人项目主页</p>
+      <h1>wzzsl.fun</h1>
+      <p class="intro">
+        这里收录我做的各类小应用与前端练习。每个项目独立部署在各自的子域名下，
+        各自持有自己的数据库与运行时，互不干扰。
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-solid" href="#apps">
+          浏览项目
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/wzszdsa/wzzsl-site">
+          源码仓库
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3h7v7M13 3 5 11"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <aside class="hero-aside" aria-label="站点状态">
+      <p class="aside-label">
+        <span class="pulse" aria-hidden="true"></span>
+        全部运行中
+      </p>
+      <ul class="domains">
+        <li><code>yijian.wzzsl.fun</code><span class="aside-note">快递查询</span></li>
+        <li><code>petcare.wzzsl.fun</code><span class="aside-note">宠物预约</span></li>
+        <li><code>days.wzzsl.fun</code><span class="aside-note">纪念日</span></li>
+        <li><code>todo.wzzsl.fun</code><span class="aside-note">待办清单</span></li>
+        <li><code>box.wzzsl.fun</code><span class="aside-note">推箱子</span></li>
+        <li><code>demo.wzzsl.fun</code><span class="aside-note">前端练习</span></li>
+      </ul>
+    </aside>
   </header>
 
-  <section aria-labelledby="apps-heading">
-    <h2 id="apps-heading">应用</h2>
-    <ul class="grid">
-      <li>
-        <a class="card" href="https://yijian.wzzsl.fun">
-          <span class="card-title">驿见快递查询</span>
-          <span class="card-desc">聚合多家快递的物流查询，支持账号登录与包裹跟踪</span>
-          <span class="tags"><em>React</em><em>Node API</em><em>MySQL</em></span>
+  <!-- ============ 应用：12 栏非对称网格 ============ -->
+  <section id="apps" aria-labelledby="apps-heading">
+    <div class="section-head">
+      <h2 id="apps-heading">应用</h2>
+      <p class="section-note">带后端与数据库的完整项目</p>
+    </div>
+
+    <ul class="bento">
+      <li class="span-7">
+        <a class="card" href="https://yijian.wzzsl.fun" style="--i:0">
+          <span class="card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/>
+              <path d="M3 7.5 12 12l9-4.5M12 12v9"/>
+            </svg>
+          </span>
+          <span class="card-body">
+            <span class="card-title">驿见快递查询</span>
+            <span class="card-desc">聚合多家快递的物流查询，支持账号登录、验证码与包裹跟踪提醒。</span>
+            <span class="tags"><em>React</em><em>Node API</em><em>MariaDB</em></span>
+          </span>
+          <span class="card-arrow" aria-hidden="true">
+            <svg viewBox="0 0 16 16"><path d="M4 12 12 4M6 4h6v6"/></svg>
+          </span>
         </a>
       </li>
-      <li>
-        <a class="card" href="https://petcare.wzzsl.fun">
-          <span class="card-title">宠物预约</span>
-          <span class="card-desc">宠物洗护预约系统，含时段管理与图片生成</span>
-          <span class="tags"><em>Next.js</em><em>PostgreSQL</em></span>
+
+      <li class="span-5">
+        <a class="card" href="https://petcare.wzzsl.fun" style="--i:1">
+          <span class="card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <circle cx="8" cy="7" r="2"/>
+              <circle cx="16" cy="7" r="2"/>
+              <circle cx="5.5" cy="12.5" r="2"/>
+              <circle cx="18.5" cy="12.5" r="2"/>
+              <path d="M12 12.5c3 0 5 2 5 4.2 0 1.6-1.2 2.8-2.8 2.8-1 0-1.6-.4-2.2-.4s-1.2.4-2.2.4C8.2 19.5 7 18.3 7 16.7c0-2.2 2-4.2 5-4.2z"/>
+            </svg>
+          </span>
+          <span class="card-body">
+            <span class="card-title">宠物预约</span>
+            <span class="card-desc">宠物洗护预约系统，含时段管理、订单状态流转与图片生成。</span>
+            <span class="tags"><em>Next.js</em><em>PostgreSQL</em></span>
+          </span>
+          <span class="card-arrow" aria-hidden="true">
+            <svg viewBox="0 0 16 16"><path d="M4 12 12 4M6 4h6v6"/></svg>
+          </span>
         </a>
       </li>
-      <li>
-        <a class="card" href="https://days.wzzsl.fun">
-          <span class="card-title">纪念日</span>
-          <span class="card-desc">温暖简洁的纪念日记录，支持离线使用</span>
-          <span class="tags"><em>React</em><em>PWA</em></span>
+
+      <li class="span-5">
+        <a class="card" href="https://days.wzzsl.fun" style="--i:2">
+          <span class="card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <rect x="3.5" y="5" width="17" height="15" rx="2.5"/>
+              <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/>
+              <path d="M12 17.2s-2.6-1.6-2.6-3.2c0-.9.7-1.5 1.5-1.5.5 0 .9.2 1.1.6.2-.4.6-.6 1.1-.6.8 0 1.5.6 1.5 1.5 0 1.6-2.6 3.2-2.6 3.2z"/>
+            </svg>
+          </span>
+          <span class="card-body">
+            <span class="card-title">纪念日</span>
+            <span class="card-desc">温暖简洁的纪念日记录，支持离线使用与主屏安装。</span>
+            <span class="tags"><em>React</em><em>PWA</em></span>
+          </span>
+          <span class="card-arrow" aria-hidden="true">
+            <svg viewBox="0 0 16 16"><path d="M4 12 12 4M6 4h6v6"/></svg>
+          </span>
         </a>
       </li>
-      <li>
-        <a class="card" href="https://todo.wzzsl.fun">
-          <span class="card-title">待办清单</span>
-          <span class="card-desc">轻量的任务记录与提醒</span>
-          <span class="tags"><em>React</em><em>Vite</em></span>
+
+      <li class="span-7">
+        <a class="card" href="https://todo.wzzsl.fun" style="--i:3">
+          <span class="card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 7l2 2 3-3M4 14l2 2 3-3M12.5 7.5h7M12.5 14.5h7"/>
+            </svg>
+          </span>
+          <span class="card-body">
+            <span class="card-title">待办清单</span>
+            <span class="card-desc">轻量的任务记录与提醒，数据保存在本地，打开即用。</span>
+            <span class="tags"><em>React</em><em>Vite</em></span>
+          </span>
+          <span class="card-arrow" aria-hidden="true">
+            <svg viewBox="0 0 16 16"><path d="M4 12 12 4M6 4h6v6"/></svg>
+          </span>
         </a>
       </li>
     </ul>
   </section>
 
-  <section aria-labelledby="games-heading">
-    <h2 id="games-heading">游戏与练习</h2>
-    <ul class="grid">
-      <li>
-        <a class="card" href="https://box.wzzsl.fun">
-          <span class="card-title">推箱子</span>
-          <span class="card-desc">六关温暖仓库主题的浏览器推箱子</span>
-          <span class="tags"><em>JavaScript</em></span>
+  <!-- ============ 游戏与练习 ============ -->
+  <section id="more" aria-labelledby="more-heading">
+    <div class="section-head">
+      <h2 id="more-heading">游戏与练习</h2>
+      <p class="section-note">纯前端实现，无后端依赖</p>
+    </div>
+
+    <ul class="bento">
+      <li class="span-5">
+        <a class="card" href="https://box.wzzsl.fun" style="--i:0">
+          <span class="card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/>
+              <rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/>
+              <rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/>
+              <path d="M17 13.5v7M13.5 17h7"/>
+            </svg>
+          </span>
+          <span class="card-body">
+            <span class="card-title">推箱子</span>
+            <span class="card-desc">六关温暖仓库主题的浏览器推箱子，键盘与触屏均可操作。</span>
+            <span class="tags"><em>JavaScript</em></span>
+          </span>
+          <span class="card-arrow" aria-hidden="true">
+            <svg viewBox="0 0 16 16"><path d="M4 12 12 4M6 4h6v6"/></svg>
+          </span>
         </a>
       </li>
-      <li>
-        <a class="card" href="https://demo.wzzsl.fun">
-          <span class="card-title">前端练习合集</span>
-          <span class="card-desc">早期学习阶段做的页面练习，共 20 组</span>
-          <span class="tags"><em>HTML</em><em>CSS</em></span>
+
+      <li class="span-7">
+        <a class="card" href="https://demo.wzzsl.fun" style="--i:1">
+          <span class="card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M9 7 4.5 12 9 17M15 7l4.5 5L15 17"/>
+            </svg>
+          </span>
+          <span class="card-body">
+            <span class="card-title">前端练习合集</span>
+            <span class="card-desc">早期学习阶段做的页面练习，共 20 组：布局、动画、电商页面与交互效果。</span>
+            <span class="tags"><em>HTML</em><em>CSS</em></span>
+          </span>
+          <span class="card-arrow" aria-hidden="true">
+            <svg viewBox="0 0 16 16"><path d="M4 12 12 4M6 4h6v6"/></svg>
+          </span>
         </a>
       </li>
     </ul>
   </section>
 
   <footer>
-    <p>
-      <a href="https://github.com/wzszdsa/wzzsl-site">源码仓库</a>
+    <p class="footer-main">wzzsl.fun</p>
+    <p class="footer-note">
+      由 Nginx 按子域名分流，各站点独立构建部署。
+      <a href="https://github.com/wzszdsa/wzzsl-site">查看源码仓库</a>
     </p>
   </footer>
 
 </main>
+
+<script>
+(function () {
+  'use strict';
+
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var cards  = Array.prototype.slice.call(document.querySelectorAll('.card'));
+
+  /* ---- 滚动入场：卡片进入视口后浮现 ---- */
+  if (reduce || !('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.classList.add('is-visible'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        io.unobserve(entry.target);       // 只播放一次，随后解除观察
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+
+    cards.forEach(function (c) { io.observe(c); });
+
+    /* 动画播完后撤销 animation：fill-mode:both 会锁死 transform，
+       不撤销的话悬停上浮将完全失效 */
+    cards.forEach(function (c) {
+      c.addEventListener('animationend', function () {
+        c.classList.add('revealed');
+      }, { once: true });
+    });
+  }
+
+  /* ---- 卡片柔光跟随光标 ----
+     指针为粗略设备（触屏）时跳过：没有悬停概念，且可省去无谓监听 */
+  if (reduce || window.matchMedia('(pointer: coarse)').matches) return;
+
+  cards.forEach(function (card) {
+    card.addEventListener('pointermove', function (e) {
+      var r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    }, { passive: true });
+
+    card.addEventListener('pointerleave', function () {
+      card.style.removeProperty('--mx');
+      card.style.removeProperty('--my');
+    }, { passive: true });
+  });
+})();
+</script>
+
 </body>
 </html>
