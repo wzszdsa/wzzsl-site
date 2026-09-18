@@ -1,0 +1,14 @@
+node_modules/
+.netlify/
+*.log
+work-*-prompt.txt
+
+work-netlify-openapi.json
+dist/
+release/
+android/.gradle/
+android/app/build/
+android/build/
+
+work/
+

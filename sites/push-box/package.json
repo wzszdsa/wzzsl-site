@@ -1,0 +1,29 @@
+{
+  "name": "warm-warehouse-sokoban",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build:web": "node scripts/build-static.mjs",
+    "test:packaging": "npm run build:web && node --test tests/packaging.test.js",
+    "desktop:package": "npm run build:web && electron-forge package --platform win32 --arch x64",
+    "desktop:make": "npm run build:web && electron-forge make --platform win32 --arch x64",
+    "android:sync": "npm run build:web && cap sync android",
+    "android:build": "npm run android:sync && node scripts/build-android.mjs",
+    "android:doctor": "cap doctor android",
+    "android:open": "cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "electron": "^43.4.1"
+  },
+  "main": "desktop/main.cjs",
+  "version": "1.0.0",
+  "description": "A cozy browser Sokoban puzzle game with six warm warehouse levels.",
+  "author": "wzszdsa"
+}

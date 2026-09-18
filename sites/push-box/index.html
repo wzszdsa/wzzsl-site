@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f6efe4" />
+  <title>仓库搬运工 · 推箱子</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">📦</span><div><p class="eyebrow">WARM WAREHOUSE</p><h1>仓库搬运工</h1></div></div>
+      <div class="top-actions"><span class="key-hint">方向键 / WASD 移动</span><button id="reset" class="ghost-button" type="button">↻ 重置</button></div>
+    </header>
+
+    <section class="hero-copy">
+      <div><p class="eyebrow accent">每日整理任务</p><h2>把混乱的仓库，<em>整理得刚刚好。</em></h2><p class="intro">推动木箱到黄色目标点，完成每一关的货物归位。小心，箱子只能向前推，不能向后拉。</p></div>
+      <div class="progress-note"><span class="progress-dot"></span><span id="level-count">关卡 1 / 6</span></div>
+    </section>
+
+    <section class="game-layout">
+      <aside class="sidebar left-panel">
+        <div class="panel-heading"><span>关卡目录</span><span class="tiny-label">LEVELS</span></div>
+        <nav id="level-list" class="level-list" aria-label="关卡目录"></nav>
+        <div class="tip-card"><span class="tip-icon">💡</span><div><strong>小提示</strong><p>先规划箱子的路线，再开始推动。按 Z 可以撤销上一步。</p></div></div>
+      </aside>
+
+      <section class="play-area" aria-label="推箱子游戏区域">
+        <div class="board-frame"><div id="board" class="board" role="application" aria-label="推箱子棋盘"></div></div>
+        <div class="status-row"><p id="status" class="status">把所有木箱推到黄色目标点</p><button id="next" class="primary-button" type="button" disabled>下一关 →</button></div>
+        <div class="mobile-controls" aria-label="移动控制"><button data-direction="up" type="button">↑</button><div><button data-direction="left" type="button">←</button><button data-direction="down" type="button">↓</button><button data-direction="right" type="button">→</button></div></div>
+      </section>
+
+      <aside class="sidebar right-panel">
+        <div class="current-level"><span class="tiny-label">CURRENT LEVEL</span><h3 id="level-title">入门仓</h3><p id="level-hint">先熟悉推箱子的节奏</p></div>
+        <div class="stats"><div class="stat"><span>移动次数</span><strong id="moves">00</strong></div><div class="stat"><span>推动次数</span><strong id="pushes">00</strong></div></div>
+        <button id="undo" class="secondary-button" type="button" disabled>↶ 撤销一步</button>
+        <div class="legend"><p class="tiny-label">图例</p><div><span class="legend-swatch goal-swatch">✦</span>目标点</div><div><span class="legend-swatch box-swatch"><img src="./assets/crate.png" alt="" /></span>待归位箱子</div><div><span class="legend-swatch done-swatch">✓</span>已完成</div></div>
+      </aside>
+    </section>
+    <footer><span>Made for slow thinking · 6 个暖色仓库关卡</span><span>R 重置 · Z 撤销</span></footer>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
