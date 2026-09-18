@@ -287,6 +287,7 @@ Alibaba Cloud Linux 的 SELinux 与 firewalld 会引入一批「配置看着没�
 
 | 现象 | 排查方向 |
 |---|---|
+| **中文显示为乱码** | 响应缺少字符集声明。目录索引（autoindex）生成的 HTML 既无 charset 响应头也无 `<meta charset>`，浏览器会回退到默认编码解析。已在 Nginx 配置中声明 `charset utf-8;` 修复。验证：`curl -I` 看 `Content-Type` 是否带 `charset=utf-8` |
 | 静态站点 **403** | SELinux 未放行文件读取：`restorecon -Rv /srv/wzzsl/<site>`；`ls -Z` 确认上下文为 `httpd_sys_content_t` |
 | 反代站点 **502** | SELinux 未放行网络连接：`setsebool -P httpd_can_network_connect 1` |
 | 子域 **SSL error 35** | 证书 SAN 未包含该子域 —— 需重新签发（步骤 2） |
