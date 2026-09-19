@@ -50,6 +50,22 @@ body {
   font-size: 2rem;
   cursor: pointer;
 }
+
+/* 图标由 ionicons Web Components 改为内联 SVG 后，
+   需显式设定尺寸与描边（原先依赖 font-size 控制大小） */
+.icons svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icons svg .fill {
+  fill: currentColor;
+  stroke: none;
+}
 .card h2 {
   font-family: sans-serif;
   color: rgb(175, 158, 158);

@@ -335,7 +335,7 @@
   display: block;
   content: '';
 }
-#wrapper #content .containMain #center .right .rightBottom .choose #mark {
+#wrapper #content .containMain #center .right .rightBottom .choose .mark {
   height: 30px;
   background-color: snow;
   border: 1px solid #ddd;
@@ -345,7 +345,7 @@
   line-height: 30px;
   float: left;
 }
-#wrapper #content .containMain #center .right .rightBottom .choose #mark a {
+#wrapper #content .containMain #center .right .rightBottom .choose .mark a {
   color: red;
   margin-left: 20px;
 }

@@ -4,11 +4,9 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-    <script
-      src="https://kit.fontawesome.com/64d58efce2.js"
-      crossorigin="anonymous"
-    ></script>
+    <title>联系我们</title>
+    <!-- 原先引用的 https://kit.fontawesome.com/64d58efce2.js 已返回 403，
+         社交图标改为内联 SVG，去掉此外部依赖 -->
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800&display=swap");
       *{
@@ -216,15 +214,21 @@
         margin-top: 0.5rem;
       }
       .social-icons a{
+        display: flex;
+        align-items: center;
+        justify-content: center;
         width: 35px;
         height: 35px;
         border-radius: 5px;
         background: linear-gradient(45deg,#1abc9c,#149279);
         color: #fff;
-        text-align: center;
-        line-height: 35px;
         margin-right: 0.5rem;
         transition: 0.3s;
+      }
+      /* 图标由字体改为内联 SVG 后，尺寸需显式指定 */
+      .social-icons svg{
+        width: 17px;
+        height: 17px;
       }
       .social-icons a:hover{
         transform: scale(1.05);
@@ -339,6 +343,7 @@
         }
     }
     </style>
+      <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   </head>
   <body>
     <div class="container">
@@ -369,10 +374,18 @@
           <div class="social-media">
             <p>Connect with us :</p>
             <div class="social-icons">
-              <a href="#"><i class="fab fa-facebook"></i></a>
-              <a href="#"><i class="fab fa-twitter"></i></a>
-              <a href="#"><i class="fab fa-instagram"></i></a>
-              <a href="#"><i class="fab fa-linkedin-in"></i></a>
+              <a href="#" aria-label="Facebook">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.4 21v-7.2h2.4l.36-2.8h-2.76V9.2c0-.8.22-1.35 1.37-1.35h1.47V5.34c-.25-.03-1.12-.1-2.13-.1-2.11 0-3.56 1.28-3.56 3.65v2.03H8.1v2.8h2.45V21z"/></svg>
+              </a>
+              <a href="#" aria-label="Twitter">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.6 6.2c-.7.31-1.46.52-2.25.62.81-.49 1.43-1.26 1.72-2.18-.76.45-1.6.78-2.49.95a3.92 3.92 0 0 0-6.68 3.57A11.13 11.13 0 0 1 3.8 5.1a3.92 3.92 0 0 0 1.21 5.23c-.64-.02-1.24-.2-1.77-.49v.05c0 1.9 1.35 3.48 3.15 3.84-.33.09-.68.14-1.04.14-.25 0-.5-.02-.74-.07a3.92 3.92 0 0 0 3.66 2.72A7.86 7.86 0 0 1 2.4 18.2a11.09 11.09 0 0 0 6.01 1.76c7.21 0 11.15-5.97 11.15-11.15l-.01-.51c.77-.55 1.43-1.24 1.95-2.03z"/></svg>
+              </a>
+              <a href="#" aria-label="Instagram">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.6"/><circle cx="12" cy="12" r="3.7"/><circle cx="16.9" cy="7.1" r="1.05" fill="currentColor" stroke="none"/></svg>
+              </a>
+              <a href="#" aria-label="LinkedIn">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.1 9.1H4.3V19h2.8zM5.7 4.3a1.62 1.62 0 1 0 0 3.25 1.62 1.62 0 0 0 0-3.25zM19.7 19v-5.9c0-3.03-1.62-4.44-3.78-4.44-1.74 0-2.52 1-2.95 1.62V9.1h-2.8V19h2.8v-5.82c0-1.5.79-2.2 1.77-2.2s1.68.7 1.68 2.2V19z"/></svg>
+              </a>
             </div>
           </div>
         </div>
